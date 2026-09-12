@@ -1,0 +1,25 @@
+/node_modules
+/dist
+/dist-ssr
+*.local
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# TypeScript incremental build caches
+*.tsbuildinfo
+
+# Tooling scratch / agent metadata — not part of the app
+.ai/
+.mcp.json
+
+# Local env files — must never be committed
+.env
+.env.*
+!.env.example
