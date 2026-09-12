@@ -1,4 +1,4 @@
-export type UserId = 'user1' | 'user2';
+export type UserId = 'dima' | 'anya';
 
 export interface User {
   id: UserId;

@@ -27,8 +27,8 @@ export function setActiveUserHeader(userId: UserId): void {
   postgrestHeaders().set('x-plank-user', userId);
 }
 
-export const KNOWN_USER_IDS: readonly UserId[] = ['user1', 'user2'];
+export const KNOWN_USER_IDS: readonly UserId[] = ['dima', 'anya'];
 
 export function isKnownUserId(value: string): value is UserId {
-  return value === 'user1' || value === 'user2';
+  return value === 'dima' || value === 'anya';
 }

@@ -30,7 +30,7 @@ function emptyEntries(): YearProgress['entries'] {
 function rowsToEntries(rows: PlankRow[]): YearProgress['entries'] {
   const entries = emptyEntries();
   for (const row of rows) {
-    if (row.user_id !== 'user1' && row.user_id !== 'user2') continue;
+    if (row.user_id !== 'dima' && row.user_id !== 'anya') continue;
     if (!Number.isFinite(row.duration_seconds) || row.duration_seconds <= 0) continue;
     entries[row.user_id][row.date] = row.duration_seconds;
   }

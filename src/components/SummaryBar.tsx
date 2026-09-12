@@ -48,7 +48,7 @@ export function SummaryBar({ progress }: SummaryBarProps) {
         return (
           <div
             key={user.id}
-            className={`rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 ${ACCENT_RING[user.accent] ?? ''}`}
+            className={`rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 transition-shadow hover:shadow-md ${ACCENT_RING[user.accent] ?? ''}`}
           >
             <header className="mb-3 flex items-center gap-2">
               <span className={`inline-block h-2.5 w-2.5 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-slate-400'}`} />
@@ -58,9 +58,9 @@ export function SummaryBar({ progress }: SummaryBarProps) {
             </header>
 
             <dl className="grid grid-cols-3 gap-3 text-center">
-              <Stat label="Дней" value={String(stats.count)} />
-              <Stat label="Лучший" value={formatSeconds(stats.best)} />
-              <Stat label="Средний" value={formatSeconds(stats.average)} />
+              <Stat label="Days" value={String(stats.count)} />
+              <Stat label="Best" value={formatSeconds(stats.best)} />
+              <Stat label="Average" value={formatSeconds(stats.average)} />
             </dl>
           </div>
         );

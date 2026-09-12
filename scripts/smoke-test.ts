@@ -42,10 +42,10 @@ if (!url || !key) {
 
 const supabase = createClient(url, key, {
   auth: { persistSession: false },
-  global: { headers: { 'x-plank-user': 'user1' } },
+  global: { headers: { 'x-plank-user': 'dima' } },
 });
 
-const USER = 'user1';
+const USER = 'dima';
 const DATE = '2099-12-31'; // a date we know won't collide with real entries
 const INITIAL = 90;
 const UPDATED = 135;
@@ -151,7 +151,7 @@ async function main(): Promise<void> {
   // assert the stored value is unchanged.
   (supabase as unknown as { rest: { headers: Headers } }).rest.headers.set(
     'x-plank-user',
-    'user2',
+    'anya',
   );
   await supabase
     .from('plank_results')

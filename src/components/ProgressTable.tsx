@@ -32,8 +32,8 @@ const ACCENT_BG_HOVER: Record<string, string> = {
 };
 
 const ACCENT_RING_FOCUS: Record<string, string> = {
-  sky: 'focus-within:ring-sky-300',
-  rose: 'focus-within:ring-rose-300',
+  sky: 'ring-sky-300/70',
+  rose: 'ring-rose-300/70',
 };
 
 function ResultCell({ value, accent, onSave }: CellProps) {
@@ -78,11 +78,13 @@ function ResultCell({ value, accent, onSave }: CellProps) {
       <button
         type="button"
         onClick={startEdit}
-        className={`group flex h-full w-full items-center justify-center px-3 py-2 text-sm transition-colors ${ACCENT_BG_HOVER[accent] ?? ''}`}
+        className={`group flex h-full w-full items-center justify-center px-3 py-2 text-sm transition-colors duration-150 ${ACCENT_BG_HOVER[accent] ?? ''}`}
       >
         <span
-          className={`font-mono tabular-nums ${
-            value == null ? 'text-slate-300' : 'font-semibold text-slate-800'
+          className={`font-mono tabular-nums transition-colors ${
+            value == null
+              ? 'text-slate-300 group-hover:text-slate-400'
+              : 'font-semibold text-slate-800'
           }`}
         >
           {formatSeconds(value)}
@@ -93,7 +95,7 @@ function ResultCell({ value, accent, onSave }: CellProps) {
 
   return (
     <div
-      className={`flex h-full w-full items-center justify-center px-1.5 py-1 ring-2 ring-inset ${ACCENT_RING_FOCUS[accent] ?? 'focus-within:ring-slate-300'}`}
+      className={`flex h-full w-full items-center justify-center px-1 py-1 ring-2 ring-inset transition-shadow ${ACCENT_RING_FOCUS[accent] ?? 'ring-slate-300/70'}`}
     >
       <TextField
         inputRef={inputRef}
@@ -101,14 +103,21 @@ function ResultCell({ value, accent, onSave }: CellProps) {
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
-        placeholder="м:сс"
+        placeholder="m:ss"
         variant="standard"
         size="small"
+        inputProps={{
+          // 16px prevents iOS Safari from auto-zooming the viewport on focus.
+          inputMode: 'numeric',
+          autoComplete: 'off',
+          enterKeyHint: 'done',
+        }}
         sx={{
           width: '100%',
           '& .MuiInput-input': {
             padding: '2px 4px',
-            fontSize: '0.875rem',
+            fontSize: '16px',
+            lineHeight: 1.2,
             textAlign: 'center',
             fontFamily: 'ui-monospace, SFMono-Regular, monospace',
           },
@@ -156,7 +165,7 @@ function ProgressRow({ date, dateISO, isToday, progress, onSetResult }: RowProps
           </span>
           {isToday && (
             <span className="ml-1 rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-900">
-              сегодня
+              today
             </span>
           )}
         </div>
@@ -189,7 +198,7 @@ export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
           <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur">
             <tr className="border-b border-slate-200">
               <th className="sticky left-0 z-30 bg-slate-50/95 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Дата
+                Date
               </th>
               {USERS.map((user) => (
                 <th

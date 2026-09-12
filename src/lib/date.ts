@@ -1,19 +1,19 @@
-const MONTHS_GENITIVE = [
-  'января',
-  'февраля',
-  'марта',
-  'апреля',
-  'мая',
-  'июня',
-  'июля',
-  'августа',
-  'сентября',
-  'октября',
-  'ноября',
-  'декабря',
+const MONTHS_LONG = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ] as const;
 
-const WEEKDAYS_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'] as const;
+const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 export function getCurrentYear(): number {
   return new Date().getFullYear();
@@ -43,7 +43,7 @@ export function todayISO(): string {
 }
 
 export function formatDateDisplay(date: Date): string {
-  return `${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()]}`;
+  return `${MONTHS_LONG[date.getMonth()]} ${date.getDate()}`;
 }
 
 export function formatWeekday(date: Date): string {
@@ -54,7 +54,7 @@ export function formatSeconds(totalSeconds: number | null | undefined): string {
   if (totalSeconds == null || totalSeconds <= 0) return '—';
 
   if (totalSeconds < 60) {
-    return `${totalSeconds} сек`;
+    return `${totalSeconds}s`;
   }
 
   const hours = Math.floor(totalSeconds / 3600);
