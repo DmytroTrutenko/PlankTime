@@ -26,7 +26,13 @@ export default function App() {
           </div>
         </header>
 
-        <div className="mb-6">
+        {/* Sticky on mobile so the stats stay reachable while scrolling the
+            long list of days. md+ lets the bar sit in the normal flow instead
+            of floating over content. Negative margin is intentionally NOT used
+            here — bleeding past the parent's px-4 would let content extend to
+            the viewport edge and any inner overflow would push the whole bar
+            off-screen on narrow viewports. */}
+        <div className="sticky top-0 z-30 mb-3 rounded-2xl bg-canvas/85 px-2 pt-2 pb-2 shadow-[0_2px_8px_-2px_rgb(0_0_0_/0.08)] backdrop-blur supports-[backdrop-filter]:bg-canvas/65 sm:px-3 md:static md:mb-6 md:bg-transparent md:px-0 md:pt-0 md:pb-0 md:shadow-none md:backdrop-blur-0 md:supports-[backdrop-filter]:bg-transparent">
           <SummaryBar progress={progress} />
         </div>
 

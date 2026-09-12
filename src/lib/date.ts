@@ -13,7 +13,64 @@ const MONTHS_LONG = [
   'Dec',
 ] as const;
 
+const MONTHS_FULL = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
 const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+export interface MonthGroup {
+  year: number;
+  month: number;
+  label: string;
+  fullLabel: string;
+  dates: Date[];
+  isCompleted: boolean;
+  isCurrent: boolean;
+}
+
+export function groupDatesByMonth(year: number, today: Date = new Date()): MonthGroup[] {
+  const all = generateYearDates(year);
+  const todayMidnight = new Date(today);
+  todayMidnight.setHours(0, 0, 0, 0);
+
+  const groups: MonthGroup[] = [];
+  for (const date of all) {
+    const month = date.getMonth();
+    const last = groups[groups.length - 1];
+    if (!last || last.month !== month) {
+      const monthEnd = new Date(year, month + 1, 0);
+      monthEnd.setHours(0, 0, 0, 0);
+      groups.push({
+        year,
+        month,
+        label: MONTHS_LONG[month],
+        fullLabel: MONTHS_FULL[month],
+        dates: [],
+        isCompleted: monthEnd.getTime() < todayMidnight.getTime(),
+        isCurrent:
+          date.getFullYear() === todayMidnight.getFullYear() &&
+          month === todayMidnight.getMonth(),
+      });
+    }
+    // Push into the LAST group (just-created on a month boundary, or the
+    // previous group when month is unchanged). Using `last` here would be
+    // wrong because `last` is a const captured before the push above.
+    groups[groups.length - 1]!.dates.push(date);
+  }
+  return groups;
+}
 
 export function getCurrentYear(): number {
   return new Date().getFullYear();

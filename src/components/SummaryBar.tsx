@@ -55,24 +55,24 @@ const ACCENT_STREAK_BG_ACTIVE: Record<string, string> = {
 
 export function SummaryBar({ progress }: SummaryBarProps) {
   return (
-    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <section className="grid grid-cols-2 gap-2 sm:gap-3">
       {USERS.map((user) => {
         const stats = computeStats(progress, user.id);
         const streakActive = stats.streak > 0;
         return (
           <div
             key={user.id}
-            className={`rounded-2xl bg-white p-4 shadow-soft ring-1 transition-shadow hover:shadow-lift dark:bg-stone-950 dark:ring-stone-800/60 ${ACCENT_RING[user.accent] ?? 'ring-stone-200/70 dark:ring-stone-800/60'}`}
+            className={`min-w-0 rounded-2xl bg-white p-2.5 shadow-soft ring-1 transition-shadow hover:shadow-lift sm:p-4 dark:bg-stone-950 dark:ring-stone-800/60 ${ACCENT_RING[user.accent] ?? 'ring-stone-200/70 dark:ring-stone-800/60'}`}
           >
-            <header className="mb-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className={`inline-block h-2 w-2 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-stone-400'}`} />
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-700 dark:text-stone-200">
+            <header className="mb-2 flex items-center justify-between gap-2 sm:mb-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-stone-400'}`} />
+                <h2 className="truncate text-sm font-semibold uppercase tracking-wide text-stone-700 dark:text-stone-200">
                   {user.name}
                 </h2>
               </div>
               <span
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums transition-colors ${
+                className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none tabular-nums transition-colors sm:px-2.5 ${
                   streakActive
                     ? ACCENT_STREAK_BG_ACTIVE[user.accent] ?? 'bg-stone-800 text-white'
                     : ACCENT_STREAK_BG[user.accent] ?? 'bg-stone-100 text-stone-500 dark:bg-stone-900 dark:text-stone-400'
@@ -84,10 +84,14 @@ export function SummaryBar({ progress }: SummaryBarProps) {
               </span>
             </header>
 
-            <dl className="grid grid-cols-3 gap-2 text-center">
+            <dl className="grid grid-cols-2 gap-1 text-center sm:grid-cols-3 sm:gap-2">
               <Stat label="Days" value={String(stats.count)} />
               <Stat label="Best" value={formatSeconds(stats.best)} />
-              <Stat label="Average" value={formatSeconds(stats.average)} />
+              <Stat
+                label="Average"
+                value={formatSeconds(stats.average)}
+                className="col-span-2 sm:col-span-1"
+              />
             </dl>
           </div>
         );
@@ -99,15 +103,16 @@ export function SummaryBar({ progress }: SummaryBarProps) {
 interface StatProps {
   label: string;
   value: string;
+  className?: string;
 }
 
-function Stat({ label, value }: StatProps) {
+function Stat({ label, value, className = '' }: StatProps) {
   return (
-    <div className="rounded-xl bg-stone-50 px-2 py-2 dark:bg-stone-900/70">
-      <dt className="text-[11px] font-medium uppercase tracking-wider text-stone-500 dark:text-stone-400">
+    <div className={`min-w-0 overflow-hidden rounded-xl bg-stone-50 px-1 py-1.5 sm:px-2 sm:py-2 dark:bg-stone-900/70 ${className}`}>
+      <dt className="truncate text-[10px] font-medium uppercase tracking-wider text-stone-500 sm:text-[11px] dark:text-stone-400">
         {label}
       </dt>
-      <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+      <dd className="mt-0.5 truncate font-mono text-xs font-semibold tabular-nums text-stone-900 sm:mt-1 sm:text-sm dark:text-stone-50">
         {value}
       </dd>
     </div>

@@ -18,6 +18,20 @@ export function createEmptyYearProgress(year: number): YearProgress {
   return { year, entries };
 }
 
+export function monthEntryCount(
+  progress: YearProgress,
+  dates: Date[],
+): number {
+  let count = 0;
+  for (const user of USERS) {
+    const entries = progress.entries[user.id];
+    for (const date of dates) {
+      if (formatDateISO(date) in entries) count += 1;
+    }
+  }
+  return count;
+}
+
 // Longest run of consecutive days ending today (or yesterday — gives a one-day
 // grace so editing at 1am doesn't drop the streak to zero).
 export function currentStreak(

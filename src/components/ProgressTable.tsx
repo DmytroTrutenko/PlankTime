@@ -1,5 +1,5 @@
-import { forwardRef, useEffect, useRef, useState } from 'react';
-import type { CSSProperties, KeyboardEvent } from 'react';
+import { createContext, forwardRef, useContext, useEffect, useRef, useState } from 'react';
+import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 
 import { USERS } from '../config/users';
 import {
@@ -7,11 +7,12 @@ import {
   formatDateISO,
   formatSeconds,
   formatWeekday,
-  generateYearDates,
+  groupDatesByMonth,
   parseTimeInput,
   todayISO,
+  type MonthGroup,
 } from '../lib/date';
-import { getResult } from '../lib/progress';
+import { getResult, monthEntryCount } from '../lib/progress';
 import type { UserId, YearProgress } from '../types/progress';
 
 interface ProgressTableProps {
@@ -363,8 +364,161 @@ const DayCard = forwardRef<HTMLDivElement, RowProps>(function DayCard(
   );
 });
 
+// Chevron SVG used by the month accordion. Rotated by CSS rather than swapping
+// the path so the icon geometry stays stable across toggles.
+function ChevronDown({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M5 7.5L10 12.5L15 7.5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+interface MonthSectionContextValue {
+  collapsed: boolean;
+  setCollapsed: (v: boolean) => void;
+  group: MonthGroup;
+}
+
+const MonthSectionContext = createContext<MonthSectionContextValue | null>(null);
+
+function useMonthSection(): MonthSectionContextValue {
+  const ctx = useContext(MonthSectionContext);
+  if (!ctx) throw new Error('useMonthSection must be used inside MonthSection');
+  return ctx;
+}
+
+interface MonthSectionProps {
+  group: MonthGroup;
+  defaultCollapsed: boolean;
+  children: ReactNode;
+}
+
+// Shared month-section wrapper that tracks collapsed state and renders a
+// single children block. Each instance owns its own collapsed state so
+// toggling one month doesn't affect any other.
+function MonthSection({ group, defaultCollapsed, children }: MonthSectionProps) {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  return (
+    <MonthSectionContext.Provider value={{ collapsed, setCollapsed, group }}>
+      {children}
+    </MonthSectionContext.Provider>
+  );
+}
+
+// Month header row for the desktop table layout. Spans every column so the
+// click target covers the full row width and the row looks like a single
+// section divider instead of a left-aligned label.
+function MonthHeaderRow({
+  progress,
+}: {
+  progress: YearProgress;
+}) {
+  const { group, collapsed, setCollapsed } = useMonthSection();
+  const entryCount = monthEntryCount(progress, group.dates);
+  const totalSlots = group.dates.length * USERS.length;
+  const monthLabel = group.fullLabel;
+
+  return (
+    <tr className="border-y border-stone-300 bg-stone-100/80 dark:border-stone-600 dark:bg-stone-800/60">
+      <td colSpan={USERS.length + 1} className="p-0">
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          aria-expanded={!collapsed}
+          aria-controls={`month-${group.year}-${group.month}`}
+          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-stone-200/70 dark:hover:bg-stone-700/60"
+        >
+          <span className="flex items-baseline gap-3">
+            <span className="text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-200">
+              {monthLabel}
+            </span>
+            {group.isCurrent && (
+              <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-900 dark:bg-amber-800 dark:text-amber-100">
+                current
+              </span>
+            )}
+            <span className="text-xs tabular-nums text-stone-500 dark:text-stone-400">
+              {entryCount} / {totalSlots}
+            </span>
+          </span>
+          <ChevronDown
+            className={`shrink-0 text-stone-500 transition-transform duration-200 dark:text-stone-400 ${
+              collapsed ? '' : 'rotate-180'
+            }`}
+          />
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+// Month header divider for the mobile card layout. Full-width click target
+// sitting between card groups.
+function MonthHeaderCard({
+  progress,
+}: {
+  progress: YearProgress;
+}) {
+  const { group, collapsed, setCollapsed } = useMonthSection();
+  const entryCount = monthEntryCount(progress, group.dates);
+  const totalSlots = group.dates.length * USERS.length;
+
+  return (
+    <button
+      type="button"
+      onClick={() => setCollapsed(!collapsed)}
+      aria-expanded={!collapsed}
+      className="flex w-full items-center justify-between gap-2 rounded-xl border border-stone-300/80 bg-stone-100/80 px-3 py-2 text-left transition-colors hover:bg-stone-200/70 dark:border-stone-700/80 dark:bg-stone-800/60 dark:hover:bg-stone-700/60"
+    >
+      <span className="flex items-baseline gap-3">
+        <span className="text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-200">
+          {group.fullLabel}
+        </span>
+        {group.isCurrent && (
+          <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-900 dark:bg-amber-800 dark:text-amber-100">
+            current
+          </span>
+        )}
+      </span>
+      <span className="flex items-center gap-2">
+        <span className="text-xs tabular-nums text-stone-500 dark:text-stone-400">
+          {entryCount} / {totalSlots}
+        </span>
+        <ChevronDown
+          className={`shrink-0 text-stone-500 transition-transform duration-200 dark:text-stone-400 ${
+            collapsed ? '' : 'rotate-180'
+          }`}
+        />
+      </span>
+    </button>
+  );
+}
+
+// Wraps the children of a month section so it can be conditionally rendered
+// (i.e. unmounted entirely when collapsed) without breaking surrounding
+// table-row layout. Renders an empty fragment when collapsed.
+function MonthBody({ children }: { children: ReactNode }) {
+  const { collapsed } = useMonthSection();
+  if (collapsed) return null;
+  return <>{children}</>;
+}
+
 export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
-  const dates = generateYearDates(progress.year);
+  const months = groupDatesByMonth(progress.year);
   const today = todayISO();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const todayRowRef = useRef<HTMLTableRowElement | null>(null);
@@ -439,6 +593,42 @@ export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
     };
   }, []);
 
+  // Render the rows / cards for a single month. Used by both desktop table and
+  // mobile card layouts — each calls this with its own per-row renderer.
+  const renderMonthRows = (month: MonthGroup) =>
+    month.dates.map((date) => {
+      const dateISO = formatDateISO(date);
+      const isToday = dateISO === today;
+      return (
+        <ProgressRow
+          key={dateISO}
+          ref={isToday ? todayRowRef : undefined}
+          date={date}
+          dateISO={dateISO}
+          isToday={isToday}
+          progress={progress}
+          onSetResult={onSetResult}
+        />
+      );
+    });
+
+  const renderMonthCards = (month: MonthGroup) =>
+    month.dates.map((date) => {
+      const dateISO = formatDateISO(date);
+      const isToday = dateISO === today;
+      return (
+        <DayCard
+          key={dateISO}
+          ref={dateISO === today ? todayCardRef : undefined}
+          date={date}
+          dateISO={dateISO}
+          isToday={isToday}
+          progress={progress}
+          onSetResult={onSetResult}
+        />
+      );
+    });
+
   return (
     <>
       {/* Desktop / tablet: classic table. */}
@@ -466,19 +656,19 @@ export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
               </tr>
             </thead>
             <tbody>
-              {dates.map((date) => {
-                const dateISO = formatDateISO(date);
-                const isToday = dateISO === today;
+              {months.map((month) => {
+                // Auto-collapse completed months; keep the current month and
+                // any future months expanded so the user can pre-fill them.
+                const defaultCollapsed = month.isCompleted;
                 return (
-                  <ProgressRow
-                    key={dateISO}
-                    ref={isToday ? todayRowRef : undefined}
-                    date={date}
-                    dateISO={dateISO}
-                    isToday={isToday}
-                    progress={progress}
-                    onSetResult={onSetResult}
-                  />
+                  <MonthSection
+                    key={`${month.year}-${month.month}`}
+                    group={month}
+                    defaultCollapsed={defaultCollapsed}
+                  >
+                    <MonthHeaderRow progress={progress} />
+                    <MonthBody>{renderMonthRows(month)}</MonthBody>
+                  </MonthSection>
                 );
               })}
             </tbody>
@@ -486,20 +676,21 @@ export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
         </div>
       </div>
 
-      {/* Mobile: one card per day. */}
+      {/* Mobile: one card per day, grouped by collapsible month. */}
       <div className="space-y-2 md:hidden">
-        {dates.map((date) => {
-          const dateISO = formatDateISO(date);
+        {months.map((month) => {
+          const defaultCollapsed = month.isCompleted;
           return (
-            <DayCard
-              key={dateISO}
-              ref={dateISO === today ? todayCardRef : undefined}
-              date={date}
-              dateISO={dateISO}
-              isToday={dateISO === today}
-              progress={progress}
-              onSetResult={onSetResult}
-            />
+            <MonthSection
+              key={`${month.year}-${month.month}`}
+              group={month}
+              defaultCollapsed={defaultCollapsed}
+            >
+              <MonthHeaderCard progress={progress} />
+              <MonthBody>
+                <div className="mt-2 space-y-2">{renderMonthCards(month)}</div>
+              </MonthBody>
+            </MonthSection>
           );
         })}
       </div>
