@@ -24,7 +24,10 @@ interface ProgressTableProps {
 // outer <div> for both display and edit states so swapping between them
 // cannot change the visual size of the cell content. Using a <div> instead of
 // <button> eliminates UA button defaults entirely (Tailwind preflight is off
-// here, so border / background would otherwise leak through).
+// here, so border / background would otherwise leak through). Colour is set
+// on the wrapper (not on the inner <input>), because with preflight off some
+// browsers apply a UA <input> colour that wins the cascade over Tailwind
+// utility classes and renders the digits white-on-white in light mode.
 const CELL_BOX =
   'flex h-full w-full items-center justify-center border-0 bg-transparent px-3 py-2 ' +
   'font-mono text-sm tabular-nums leading-5 transition-colors duration-150 ' +
@@ -98,7 +101,13 @@ function ResultCell({ value, accent, onSave }: CellProps) {
   const valueText = formatSeconds(value);
 
   return (
-    <div className={`${CELL_BOX} ${ACCENT_BG_HOVER[accent] ?? ''}`}>
+    <div
+      className={`${CELL_BOX} ${ACCENT_BG_HOVER[accent] ?? ''} ${
+        isEmpty
+          ? 'font-normal text-stone-400 dark:text-stone-500'
+          : 'font-semibold text-stone-800 dark:text-stone-100'
+      }`}
+    >
       <input
         ref={inputRef}
         type="text"
@@ -114,14 +123,15 @@ function ResultCell({ value, accent, onSave }: CellProps) {
         autoComplete="off"
         enterKeyHint="done"
         // `touch-action: manipulation` removes the 300 ms tap delay and stops
-        // double-tap zoom on mobile so the cell never grows on tap.
+        // double-tap zoom on mobile so the cell never grows on tap. Colour is
+        // intentionally NOT set here — it comes from the wrapper above via
+        // `color: inherit` in INPUT_RESET_STYLE so UA <input> styles can't
+        // override it.
         className={
           'block w-full min-w-0 touch-manipulation appearance-none border-0 bg-transparent text-center ' +
           'outline-none focus:outline-none focus:ring-0 ' +
           'cursor-pointer ' +
-          (isEmpty
-            ? 'font-normal text-stone-300 dark:text-stone-600'
-            : 'font-semibold text-stone-800 dark:text-stone-100')
+          (isEmpty ? 'font-normal' : 'font-semibold')
         }
         style={editing ? INPUT_RESET_STYLE : INPUT_READONLY_STYLE}
       />
@@ -132,7 +142,10 @@ function ResultCell({ value, accent, onSave }: CellProps) {
 // Hard reset on the input — guarantees no UA default outline / border /
 // shadow / padding / background leaks in and shifts the layout on focus.
 // font-size 14px matches Tailwind's `text-sm` so the rendered glyphs sit at
-// the same baseline as the <span> shown in display mode.
+// the same baseline as the <span> shown in display mode. `color: 'inherit'`
+// is defensive: with Tailwind's preflight disabled here, some browsers apply
+// their own (sometimes white-on-white) UA colour to <input> that can override
+// utility classes in the cascade.
 const INPUT_RESET_STYLE: CSSProperties = {
   fontSize: '14px',
   lineHeight: '20px',
@@ -142,6 +155,7 @@ const INPUT_RESET_STYLE: CSSProperties = {
   outline: 'none',
   boxShadow: 'none',
   background: 'transparent',
+  color: 'inherit',
   WebkitAppearance: 'none',
   appearance: 'none',
 };
@@ -207,7 +221,7 @@ function CompactResultCell({
     <div
       className={`flex h-9 w-full items-center justify-center rounded-lg transition-colors appearance-none ${
         editing
-          ? 'bg-stone-100 px-2 dark:bg-stone-800'
+          ? 'bg-stone-100 px-2 text-stone-800 dark:bg-stone-800 dark:text-stone-100'
           : isEmpty
             ? 'bg-stone-100 text-stone-400 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-500 dark:hover:bg-stone-700'
             : 'bg-white text-stone-800 ring-1 ring-stone-300/80 hover:bg-stone-50 dark:bg-stone-800 dark:text-stone-100 dark:ring-stone-600/80 dark:hover:bg-stone-700'
@@ -227,9 +241,10 @@ function CompactResultCell({
         inputMode={editing ? 'numeric' : undefined}
         autoComplete="off"
         enterKeyHint="done"
-        className={`block w-full min-w-0 touch-manipulation appearance-none border-0 bg-transparent text-center outline-none focus:outline-none focus:ring-0 font-mono text-sm leading-5 font-semibold tabular-nums ${
-          editing ? 'text-stone-800 dark:text-stone-100' : ''
-        }`}
+        // Colour is intentionally NOT set here — it comes from the wrapper
+        // above via `color: inherit` in INPUT_RESET_STYLE so UA <input>
+        // styles can't override it.
+        className="block w-full min-w-0 touch-manipulation appearance-none border-0 bg-transparent text-center outline-none focus:outline-none focus:ring-0 font-mono text-sm leading-5 font-semibold tabular-nums"
         style={editing ? INPUT_RESET_STYLE : INPUT_READONLY_STYLE}
       />
     </div>
