@@ -21,11 +21,14 @@ interface ProgressTableProps {
 
 // Single source of truth for cell typography + padding — both the button and
 // the input wrapper inherit these so swapping between them cannot change the
-// visual size of the cell content. Anything that could grow the cell on focus
-// (outline / shadow / transform) is explicitly nuked.
+// visual size of the cell content. Tailwind preflight is disabled in this
+// project, so the UA <button> border (2px outset) would otherwise add 4px to
+// the cell — `border-0 bg-transparent appearance-none` kills that. select-none
+// stops click-to-edit from selecting the existing text.
 const CELL_BOX =
-  'flex h-full w-full items-center justify-center px-3 py-2 ' +
-  'font-mono text-sm tabular-nums transition-colors duration-150';
+  'flex h-full w-full items-center justify-center border-0 bg-transparent px-3 py-2 ' +
+  'font-mono text-sm tabular-nums leading-5 transition-colors duration-150 ' +
+  'appearance-none select-none';
 
 const ACCENT_BG_HOVER: Record<string, string> = {
   sky: 'hover:bg-sky-50 focus-within:bg-sky-50 dark:hover:bg-sky-950/40 dark:focus-within:bg-sky-950/50',
@@ -93,9 +96,12 @@ function ResultCell({ value, accent, onSave }: CellProps) {
       >
         <span
           className={
-            value == null
+            // inline-block + leading-5 mirrors the input's exact box, so the
+            // rendered glyphs sit on the same baseline in both states.
+            'inline-block font-mono text-sm leading-5 tabular-nums ' +
+            (value == null
               ? 'text-stone-300 group-hover:text-stone-400 dark:text-stone-600 dark:group-hover:text-stone-500'
-              : 'font-semibold text-stone-800 dark:text-stone-100'
+              : 'font-semibold text-stone-800 dark:text-stone-100')
           }
         >
           {formatSeconds(value)}
@@ -117,10 +123,7 @@ function ResultCell({ value, accent, onSave }: CellProps) {
         inputMode="numeric"
         autoComplete="off"
         enterKeyHint="done"
-        // Match the button's text rendering exactly so the cell cannot
-        // visually expand when toggling between display and edit modes.
-        // 16px prevents iOS Safari auto-zoom on input focus.
-        className="w-full min-w-0 appearance-none border-0 bg-transparent text-center font-mono text-sm font-semibold tabular-nums text-stone-800 outline-none focus:outline-none focus:ring-0 dark:text-stone-100"
+        className="w-full min-w-0 appearance-none border-0 bg-transparent text-center font-mono text-sm leading-5 font-semibold tabular-nums text-stone-800 outline-none focus:outline-none focus:ring-0 dark:text-stone-100"
         style={INPUT_RESET_STYLE}
       />
     </div>
@@ -129,8 +132,10 @@ function ResultCell({ value, accent, onSave }: CellProps) {
 
 // Hard reset on the input — guarantees no UA default outline / border /
 // shadow / padding / background leaks in and shifts the layout on focus.
+// font-size 14px matches Tailwind's `text-sm` so the rendered glyphs sit at
+// the same baseline as the <span> shown in display mode.
 const INPUT_RESET_STYLE: CSSProperties = {
-  fontSize: '16px',
+  fontSize: '14px',
   lineHeight: '20px',
   padding: '0',
   margin: '0',
@@ -198,7 +203,7 @@ function CompactResultCell({
           autoComplete="off"
           enterKeyHint="done"
           autoFocus
-          className="w-full min-w-0 appearance-none border-0 bg-transparent text-center font-mono text-sm font-semibold tabular-nums text-stone-800 outline-none focus:outline-none focus:ring-0 dark:text-stone-100"
+          className="w-full min-w-0 appearance-none border-0 bg-transparent text-center font-mono text-sm leading-5 font-semibold tabular-nums text-stone-800 outline-none focus:outline-none focus:ring-0 dark:text-stone-100"
           style={INPUT_RESET_STYLE}
         />
       </div>
@@ -209,7 +214,7 @@ function CompactResultCell({
     <button
       type="button"
       onClick={startEdit}
-      className={`flex h-9 w-full items-center justify-center rounded-lg font-mono text-sm font-semibold tabular-nums transition-colors ${
+      className={`flex h-9 w-full items-center justify-center rounded-lg border-0 font-mono text-sm leading-5 font-semibold tabular-nums transition-colors appearance-none ${
         value == null
           ? 'bg-stone-100 text-stone-400 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-500 dark:hover:bg-stone-700'
           : 'bg-white text-stone-800 ring-1 ring-stone-200/70 hover:bg-stone-50 dark:bg-stone-800 dark:text-stone-100 dark:ring-stone-700/60 dark:hover:bg-stone-700'

@@ -66,20 +66,20 @@ export function SummaryBar({ progress }: SummaryBarProps) {
           >
             <header className="mb-3 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className={`inline-block h-2.5 w-2.5 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-stone-400'}`} />
+                <span className={`inline-block h-2 w-2 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-stone-400'}`} />
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-700 dark:text-stone-200">
                   {user.name}
                 </h2>
               </div>
               <span
-                className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tabular-nums transition-colors ${
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums transition-colors ${
                   streakActive
                     ? ACCENT_STREAK_BG_ACTIVE[user.accent] ?? 'bg-stone-800 text-white'
                     : ACCENT_STREAK_BG[user.accent] ?? 'bg-stone-100 text-stone-500 dark:bg-stone-900 dark:text-stone-400'
                 }`}
                 title={streakActive ? 'Consecutive days ending today' : 'No active streak'}
               >
-                <span className="mr-0.5">🔥</span>
+                <span aria-hidden="true">🔥</span>
                 {stats.streak}d
               </span>
             </header>
