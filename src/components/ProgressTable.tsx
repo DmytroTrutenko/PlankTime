@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { CSSProperties, KeyboardEvent } from 'react';
 
 import { USERS } from '../config/users';
 import {
@@ -19,20 +19,13 @@ interface ProgressTableProps {
   onSetResult: (userId: UserId, dateISO: string, seconds: number | null) => void;
 }
 
-// Shared input styling — locked dimensions, 16px font (prevents iOS zoom),
-// no outline/transform so the field can never visually expand on focus.
-const INPUT_CLASS =
-  'w-full bg-transparent text-center font-mono text-stone-900 placeholder:text-stone-300 ' +
-  'outline-none focus:outline-none focus:ring-0 ' +
-  'dark:text-stone-100 dark:placeholder:text-stone-600';
-
-const INPUT_STYLE: React.CSSProperties = {
-  fontSize: '16px',
-  lineHeight: 1.2,
-  padding: '0',
-  border: 'none',
-  boxShadow: 'none',
-};
+// Single source of truth for cell typography + padding — both the button and
+// the input wrapper inherit these so swapping between them cannot change the
+// visual size of the cell content. Anything that could grow the cell on focus
+// (outline / shadow / transform) is explicitly nuked.
+const CELL_BOX =
+  'flex h-full w-full items-center justify-center px-3 py-2 ' +
+  'font-mono text-sm tabular-nums transition-colors duration-150';
 
 const ACCENT_BG_HOVER: Record<string, string> = {
   sky: 'hover:bg-sky-50 focus-within:bg-sky-50 dark:hover:bg-sky-950/40 dark:focus-within:bg-sky-950/50',
@@ -96,14 +89,14 @@ function ResultCell({ value, accent, onSave }: CellProps) {
       <button
         type="button"
         onClick={startEdit}
-        className={`group flex h-full w-full items-center justify-center px-3 py-2 text-sm transition-colors duration-150 ${ACCENT_BG_HOVER[accent] ?? ''}`}
+        className={`group ${CELL_BOX} ${ACCENT_BG_HOVER[accent] ?? ''}`}
       >
         <span
-          className={`font-mono tabular-nums transition-colors ${
+          className={
             value == null
               ? 'text-stone-300 group-hover:text-stone-400 dark:text-stone-600 dark:group-hover:text-stone-500'
               : 'font-semibold text-stone-800 dark:text-stone-100'
-          }`}
+          }
         >
           {formatSeconds(value)}
         </span>
@@ -112,9 +105,7 @@ function ResultCell({ value, accent, onSave }: CellProps) {
   }
 
   return (
-    <div
-      className={`flex h-full w-full items-center justify-center px-2 py-1 transition-colors ${ACCENT_BG_HOVER[accent] ?? 'bg-stone-50 dark:bg-stone-900/40'}`}
-    >
+    <div className={`${CELL_BOX} ${ACCENT_BG_HOVER[accent] ?? 'bg-stone-50 dark:bg-stone-900/40'}`}>
       <input
         ref={inputRef}
         type="text"
@@ -126,12 +117,30 @@ function ResultCell({ value, accent, onSave }: CellProps) {
         inputMode="numeric"
         autoComplete="off"
         enterKeyHint="done"
-        className={INPUT_CLASS}
-        style={INPUT_STYLE}
+        // Match the button's text rendering exactly so the cell cannot
+        // visually expand when toggling between display and edit modes.
+        // 16px prevents iOS Safari auto-zoom on input focus.
+        className="w-full min-w-0 appearance-none border-0 bg-transparent text-center font-mono text-sm font-semibold tabular-nums text-stone-800 outline-none focus:outline-none focus:ring-0 dark:text-stone-100"
+        style={INPUT_RESET_STYLE}
       />
     </div>
   );
 }
+
+// Hard reset on the input — guarantees no UA default outline / border /
+// shadow / padding / background leaks in and shifts the layout on focus.
+const INPUT_RESET_STYLE: CSSProperties = {
+  fontSize: '16px',
+  lineHeight: '20px',
+  padding: '0',
+  margin: '0',
+  border: 'none',
+  outline: 'none',
+  boxShadow: 'none',
+  background: 'transparent',
+  WebkitAppearance: 'none',
+  appearance: 'none',
+};
 
 // Compact button that doubles as a display + tap-to-edit field for the mobile cards.
 function CompactResultCell({
@@ -189,8 +198,8 @@ function CompactResultCell({
           autoComplete="off"
           enterKeyHint="done"
           autoFocus
-          className={INPUT_CLASS}
-          style={INPUT_STYLE}
+          className="w-full min-w-0 appearance-none border-0 bg-transparent text-center font-mono text-sm font-semibold tabular-nums text-stone-800 outline-none focus:outline-none focus:ring-0 dark:text-stone-100"
+          style={INPUT_RESET_STYLE}
         />
       </div>
     );
@@ -200,10 +209,10 @@ function CompactResultCell({
     <button
       type="button"
       onClick={startEdit}
-      className={`flex h-9 w-full items-center justify-center rounded-lg font-mono text-sm tabular-nums transition-colors ${
+      className={`flex h-9 w-full items-center justify-center rounded-lg font-mono text-sm font-semibold tabular-nums transition-colors ${
         value == null
           ? 'bg-stone-100 text-stone-400 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-500 dark:hover:bg-stone-700'
-          : `bg-white font-semibold text-stone-800 ring-1 ring-stone-200/70 hover:bg-stone-50 dark:bg-stone-800 dark:text-stone-100 dark:ring-stone-700/60 dark:hover:bg-stone-700`
+          : 'bg-white text-stone-800 ring-1 ring-stone-200/70 hover:bg-stone-50 dark:bg-stone-800 dark:text-stone-100 dark:ring-stone-700/60 dark:hover:bg-stone-700'
       }`}
     >
       {formatSeconds(value)}
