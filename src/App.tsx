@@ -16,9 +16,12 @@ export default function App() {
             </h1>
             <p className="mt-1 text-sm text-ink-muted">
               Click your cell to log a result. Enter time as{' '}
-              <code className="rounded bg-stone-200/70 px-1.5 py-0.5 font-mono text-xs text-stone-800 dark:bg-neutral-800 dark:text-neutral-200">90</code>,{' '}
-              <code className="rounded bg-stone-200/70 px-1.5 py-0.5 font-mono text-xs text-stone-800 dark:bg-neutral-800 dark:text-neutral-200">1:25</code> or{' '}
-              <code className="rounded bg-stone-200/70 px-1.5 py-0.5 font-mono text-xs text-stone-800 dark:bg-neutral-800 dark:text-neutral-200">2:10</code>.
+              <code className="rounded bg-stone-200/70 px-1.5 py-0.5 font-mono text-xs text-stone-800 dark:bg-neutral-800 dark:text-neutral-200">5</code>
+              {' '}for 5 minutes,{' '}
+              <code className="rounded bg-stone-200/70 px-1.5 py-0.5 font-mono text-xs text-stone-800 dark:bg-neutral-800 dark:text-neutral-200">1:25</code>{' '}
+              for 1 min 25 s, or{' '}
+              <code className="rounded bg-stone-200/70 px-1.5 py-0.5 font-mono text-xs text-stone-800 dark:bg-neutral-800 dark:text-neutral-200">0:30</code>{' '}
+              for 30 s.
             </p>
           </div>
           <div className="shrink-0 pt-1">

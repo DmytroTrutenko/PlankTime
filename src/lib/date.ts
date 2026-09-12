@@ -124,7 +124,7 @@ export function formatSeconds(totalSeconds: number | null | undefined): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
-const TIME_INPUT_PATTERN = /^\d{1,2}(:\d{1,2}){0,2}$/;
+const TIME_INPUT_PATTERN = /^\d{1,4}(:\d{1,2}){0,2}$/;
 
 export function parseTimeInput(input: string): number | null {
   const trimmed = input.trim();
@@ -136,7 +136,9 @@ export function parseTimeInput(input: string): number | null {
   if (parts.some((n) => Number.isNaN(n) || n < 0)) return null;
 
   if (parts.length === 1) {
-    return parts[0]!;
+    // Bare number = minutes by default. Typing "3" → 3:00 (180 s), not 3 s.
+    // For sub-minute values use the colon form, e.g. "0:30".
+    return parts[0]! * 60;
   }
   if (parts.length === 2) {
     return parts[0]! * 60 + parts[1]!;

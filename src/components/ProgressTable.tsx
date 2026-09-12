@@ -118,7 +118,7 @@ function ResultCell({ value, accent, onSave }: CellProps) {
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
-        placeholder={editing ? 'm:ss' : '—'}
+        placeholder={editing ? 'min or m:ss' : '—'}
         inputMode={editing ? 'numeric' : undefined}
         autoComplete="off"
         enterKeyHint="done"
@@ -237,7 +237,7 @@ function CompactResultCell({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
-        placeholder={editing ? 'm:ss' : '—'}
+        placeholder={editing ? 'min or m:ss' : '—'}
         inputMode={editing ? 'numeric' : undefined}
         autoComplete="off"
         enterKeyHint="done"
