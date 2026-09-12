@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent } from 'react';
 
 import { USERS } from '../config/users';
@@ -19,16 +19,22 @@ interface ProgressTableProps {
   onSetResult: (userId: UserId, dateISO: string, seconds: number | null) => void;
 }
 
-// Single source of truth for cell typography + padding — both the button and
-// the input wrapper inherit these so swapping between them cannot change the
-// visual size of the cell content. Tailwind preflight is disabled in this
-// project, so the UA <button> border (2px outset) would otherwise add 4px to
-// the cell — `border-0 bg-transparent appearance-none` kills that. select-none
-// stops click-to-edit from selecting the existing text.
+// Single source of truth for cell typography + padding — applied to the SAME
+// outer <div> for both display and edit states so swapping between them
+// cannot change the visual size of the cell content. Using a <div> instead of
+// <button> eliminates UA button defaults entirely (Tailwind preflight is off
+// here, so border / background would otherwise leak through).
 const CELL_BOX =
   'flex h-full w-full items-center justify-center border-0 bg-transparent px-3 py-2 ' +
   'font-mono text-sm tabular-nums leading-5 transition-colors duration-150 ' +
   'appearance-none select-none';
+
+// Width-filling child for both states — keeps the "clickable area" the same
+// width whether the user is viewing or editing. `block w-full` overrides the
+// flex item's content-based main-size so it stretches like the input does.
+const CELL_INNER =
+  'block w-full text-center font-mono text-sm leading-5 tabular-nums ' +
+  'text-stone-800 dark:text-stone-100';
 
 const ACCENT_BG_HOVER: Record<string, string> = {
   sky: 'hover:bg-sky-50 focus-within:bg-sky-50 dark:hover:bg-sky-950/40 dark:focus-within:bg-sky-950/50',
@@ -89,24 +95,30 @@ function ResultCell({ value, accent, onSave }: CellProps) {
 
   if (!editing) {
     return (
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={startEdit}
-        className={`group ${CELL_BOX} ${ACCENT_BG_HOVER[accent] ?? ''}`}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            startEdit();
+          }
+        }}
+        className={`group cursor-pointer outline-none focus:outline-none ${CELL_BOX} ${ACCENT_BG_HOVER[accent] ?? ''}`}
       >
         <span
           className={
-            // inline-block + leading-5 mirrors the input's exact box, so the
-            // rendered glyphs sit on the same baseline in both states.
-            'inline-block font-mono text-sm leading-5 tabular-nums ' +
+            CELL_INNER +
+            ' ' +
             (value == null
-              ? 'text-stone-300 group-hover:text-stone-400 dark:text-stone-600 dark:group-hover:text-stone-500'
-              : 'font-semibold text-stone-800 dark:text-stone-100')
+              ? 'font-normal text-stone-300 group-hover:text-stone-400 dark:text-stone-600 dark:group-hover:text-stone-500'
+              : 'font-semibold')
           }
         >
           {formatSeconds(value)}
         </span>
-      </button>
+      </div>
     );
   }
 
@@ -123,7 +135,7 @@ function ResultCell({ value, accent, onSave }: CellProps) {
         inputMode="numeric"
         autoComplete="off"
         enterKeyHint="done"
-        className="w-full min-w-0 appearance-none border-0 bg-transparent text-center font-mono text-sm leading-5 font-semibold tabular-nums text-stone-800 outline-none focus:outline-none focus:ring-0 dark:text-stone-100"
+        className="block w-full min-w-0 appearance-none border-0 bg-transparent text-center font-semibold text-stone-800 outline-none focus:outline-none focus:ring-0 dark:text-stone-100"
         style={INPUT_RESET_STYLE}
       />
     </div>
@@ -233,10 +245,14 @@ interface RowProps {
   onSetResult: (userId: UserId, dateISO: string, seconds: number | null) => void;
 }
 
-function ProgressRow({ date, dateISO, isToday, progress, onSetResult }: RowProps) {
+const ProgressRow = forwardRef<HTMLTableRowElement, RowProps>(function ProgressRow(
+  { date, dateISO, isToday, progress, onSetResult },
+  ref,
+) {
   return (
     <tr
-      className={`border-b border-stone-100 transition-colors dark:border-stone-800/60 ${
+      ref={ref}
+      className={`border-b border-stone-200/70 transition-colors dark:border-stone-700/60 ${
         isToday
           ? 'bg-amber-50/60 dark:bg-amber-950/20'
           : 'hover:bg-stone-50/60 dark:hover:bg-stone-900/40'
@@ -271,7 +287,7 @@ function ProgressRow({ date, dateISO, isToday, progress, onSetResult }: RowProps
         return (
           <td
             key={user.id}
-            className="border-l border-stone-100 p-0 align-middle dark:border-stone-800/60"
+            className="border-l border-stone-200/80 p-0 align-middle dark:border-stone-700/70"
           >
             <ResultCell
               value={value}
@@ -283,7 +299,7 @@ function ProgressRow({ date, dateISO, isToday, progress, onSetResult }: RowProps
       })}
     </tr>
   );
-}
+});
 
 // One card per day for the mobile (<md) layout — shows the date, weekday,
 // and one button per user stacked vertically.
@@ -354,22 +370,49 @@ function DayCard({
 export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
   const dates = generateYearDates(progress.year);
   const today = todayISO();
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const todayRowRef = useRef<HTMLTableRowElement | null>(null);
+  const didInitialScroll = useRef(false);
+
+  // Scroll the today row to the centre of the inner scroll container on first
+  // mount. `scrollIntoView` walks up to the nearest scrollable ancestor, which
+  // is the overflow-auto div that wraps the table.
+  useEffect(() => {
+    if (didInitialScroll.current) return;
+    if (!todayRowRef.current) return;
+    didInitialScroll.current = true;
+
+    // Defer one frame so layout has settled before we read positions.
+    const raf = requestAnimationFrame(() => {
+      const row = todayRowRef.current;
+      const container = scrollContainerRef.current;
+      if (!row || !container) return;
+
+      const containerHeight = container.clientHeight;
+      const rowTop = row.offsetTop;
+      const rowHeight = row.offsetHeight;
+      const target = Math.max(0, rowTop - (containerHeight - rowHeight) / 2);
+      container.scrollTop = target;
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   return (
     <>
       {/* Desktop / tablet: classic table. */}
-      <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-stone-200/70 md:block dark:bg-stone-950 dark:ring-stone-800/60">
-        <div className="max-h-[70vh] overflow-auto">
+      <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-stone-200/70 md:block dark:bg-stone-950 dark:ring-stone-700/70">
+        <div ref={scrollContainerRef} className="max-h-[70vh] overflow-auto">
           <table className="w-full min-w-[480px] border-collapse text-sm">
             <thead className="sticky top-0 z-20 bg-stone-50/95 backdrop-blur dark:bg-stone-900/95">
-              <tr className="border-b border-stone-200 dark:border-stone-800">
+              <tr className="border-b border-stone-200 dark:border-stone-700">
                 <th className="sticky left-0 z-30 bg-stone-50/95 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500 dark:bg-stone-900/95 dark:text-stone-400">
                   Date
                 </th>
                 {USERS.map((user) => (
                   <th
                     key={user.id}
-                    className="border-l border-stone-200 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-stone-700 dark:border-stone-800 dark:text-stone-200"
+                    className="border-l border-stone-200 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-stone-700 dark:border-stone-700 dark:text-stone-200"
                   >
                     <div className="flex items-center justify-center gap-2">
                       <span
@@ -384,12 +427,14 @@ export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
             <tbody>
               {dates.map((date) => {
                 const dateISO = formatDateISO(date);
+                const isToday = dateISO === today;
                 return (
                   <ProgressRow
                     key={dateISO}
+                    ref={isToday ? todayRowRef : undefined}
                     date={date}
                     dateISO={dateISO}
-                    isToday={dateISO === today}
+                    isToday={isToday}
                     progress={progress}
                     onSetResult={onSetResult}
                   />

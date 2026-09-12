@@ -6,11 +6,26 @@
     <meta name="color-scheme" content="light dark" />
     <title>Plank — Year Tracker</title>
     <script>
-      // Apply dark mode class before React mounts so we don't flash a light theme
-      // on first paint when the user prefers dark.
+      // Resolve theme (localStorage > system) and apply the .dark class before
+      // React mounts so the first paint already matches the user's choice.
       (function () {
-        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (prefersDark) document.documentElement.classList.add('dark');
+        try {
+          var stored = localStorage.getItem('plank-theme');
+          var pref = stored === 'light' || stored === 'dark' || stored === 'system'
+            ? stored
+            : 'system';
+          var wantsDark =
+            pref === 'dark' ||
+            (pref === 'system' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (wantsDark) document.documentElement.classList.add('dark');
+          document.documentElement.dataset.theme = pref;
+        } catch (e) {
+          // localStorage may be unavailable — fall back to system preference.
+          if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+          }
+        }
       })();
     </script>
   </head>
