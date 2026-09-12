@@ -29,13 +29,6 @@ const CELL_BOX =
   'font-mono text-sm tabular-nums leading-5 transition-colors duration-150 ' +
   'appearance-none select-none';
 
-// Width-filling child for both states — keeps the "clickable area" the same
-// width whether the user is viewing or editing. `block w-full` overrides the
-// flex item's content-based main-size so it stretches like the input does.
-const CELL_INNER =
-  'block w-full text-center font-mono text-sm leading-5 tabular-nums ' +
-  'text-stone-800 dark:text-stone-100';
-
 const ACCENT_BG_HOVER: Record<string, string> = {
   sky: 'hover:bg-sky-50 focus-within:bg-sky-50 dark:hover:bg-sky-950/40 dark:focus-within:bg-sky-950/50',
   rose: 'hover:bg-rose-50 focus-within:bg-rose-50 dark:hover:bg-rose-950/40 dark:focus-within:bg-rose-950/50',
@@ -57,6 +50,11 @@ interface CellProps {
   onSave: (seconds: number | null) => void;
 }
 
+// Always render an <input>. In display mode it is `readOnly`, in edit mode
+// it becomes editable. Because the element type never changes between states,
+// the cell cannot shift on focus — there is no span → input swap. The
+// `caret-color: transparent` keeps the text caret hidden while readOnly so
+// the field visually looks like plain text, not an input.
 function ResultCell({ value, accent, onSave }: CellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -70,6 +68,7 @@ function ResultCell({ value, accent, onSave }: CellProps) {
   }, [editing]);
 
   const startEdit = () => {
+    if (editing) return;
     setDraft(value != null ? formatSeconds(value) : '');
     setEditing(true);
   };
@@ -80,6 +79,7 @@ function ResultCell({ value, accent, onSave }: CellProps) {
   };
 
   const cancel = () => {
+    setDraft('');
     setEditing(false);
   };
 
@@ -93,50 +93,36 @@ function ResultCell({ value, accent, onSave }: CellProps) {
     }
   };
 
-  if (!editing) {
-    return (
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={startEdit}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            startEdit();
-          }
-        }}
-        className={`group cursor-pointer outline-none focus:outline-none ${CELL_BOX} ${ACCENT_BG_HOVER[accent] ?? ''}`}
-      >
-        <span
-          className={
-            CELL_INNER +
-            ' ' +
-            (value == null
-              ? 'font-normal text-stone-300 group-hover:text-stone-400 dark:text-stone-600 dark:group-hover:text-stone-500'
-              : 'font-semibold')
-          }
-        >
-          {formatSeconds(value)}
-        </span>
-      </div>
-    );
-  }
+  const isEmpty = value == null;
+  const valueText = formatSeconds(value);
 
   return (
-    <div className={`${CELL_BOX} ${ACCENT_BG_HOVER[accent] ?? 'bg-stone-50 dark:bg-stone-900/40'}`}>
+    <div className={`${CELL_BOX} ${ACCENT_BG_HOVER[accent] ?? ''}`}>
       <input
         ref={inputRef}
         type="text"
-        value={draft}
+        readOnly={!editing}
+        value={editing ? draft : valueText}
+        onClick={startEdit}
+        onFocus={startEdit}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
-        placeholder="m:ss"
-        inputMode="numeric"
+        placeholder={editing ? 'm:ss' : '—'}
+        inputMode={editing ? 'numeric' : undefined}
         autoComplete="off"
         enterKeyHint="done"
-        className="block w-full min-w-0 appearance-none border-0 bg-transparent text-center font-semibold text-stone-800 outline-none focus:outline-none focus:ring-0 dark:text-stone-100"
-        style={INPUT_RESET_STYLE}
+        // `touch-action: manipulation` removes the 300 ms tap delay and stops
+        // double-tap zoom on mobile so the cell never grows on tap.
+        className={
+          'block w-full min-w-0 touch-manipulation appearance-none border-0 bg-transparent text-center ' +
+          'outline-none focus:outline-none focus:ring-0 ' +
+          'cursor-pointer ' +
+          (isEmpty
+            ? 'font-normal text-stone-300 dark:text-stone-600'
+            : 'font-semibold text-stone-800 dark:text-stone-100')
+        }
+        style={editing ? INPUT_RESET_STYLE : INPUT_READONLY_STYLE}
       />
     </div>
   );
@@ -159,7 +145,17 @@ const INPUT_RESET_STYLE: CSSProperties = {
   appearance: 'none',
 };
 
+// Same reset, but with the caret hidden so a readOnly input visually looks
+// like plain text instead of an input that can blink / receive focus rings.
+const INPUT_READONLY_STYLE: CSSProperties = {
+  ...INPUT_RESET_STYLE,
+  caretColor: 'transparent',
+};
+
 // Compact button that doubles as a display + tap-to-edit field for the mobile cards.
+// Same always-render-input pattern as the desktop cell: a single <input> toggles
+// readOnly on focus, so the element type never changes between display and edit
+// states — no width / height jump on focus.
 function CompactResultCell({
   value,
   onSave,
@@ -179,6 +175,7 @@ function CompactResultCell({
   }, [editing]);
 
   const startEdit = () => {
+    if (editing) return;
     setDraft(value != null ? formatSeconds(value) : '');
     setEditing(true);
   };
@@ -188,7 +185,10 @@ function CompactResultCell({
     setEditing(false);
   };
 
-  const cancel = () => setEditing(false);
+  const cancel = () => {
+    setDraft('');
+    setEditing(false);
+  };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
@@ -200,40 +200,38 @@ function CompactResultCell({
     }
   };
 
-  if (editing) {
-    return (
-      <div className="flex h-9 w-full items-center justify-center rounded-lg bg-stone-100 px-2 dark:bg-stone-800">
-        <input
-          ref={inputRef}
-          type="text"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={handleKeyDown}
-          placeholder="m:ss"
-          inputMode="numeric"
-          autoComplete="off"
-          enterKeyHint="done"
-          autoFocus
-          className="w-full min-w-0 appearance-none border-0 bg-transparent text-center font-mono text-sm leading-5 font-semibold tabular-nums text-stone-800 outline-none focus:outline-none focus:ring-0 dark:text-stone-100"
-          style={INPUT_RESET_STYLE}
-        />
-      </div>
-    );
-  }
+  const isEmpty = value == null;
 
   return (
-    <button
-      type="button"
-      onClick={startEdit}
-      className={`flex h-9 w-full items-center justify-center rounded-lg border-0 font-mono text-sm leading-5 font-semibold tabular-nums transition-colors appearance-none ${
-        value == null
-          ? 'bg-stone-100 text-stone-400 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-500 dark:hover:bg-stone-700'
-          : 'bg-white text-stone-800 ring-1 ring-stone-200/70 hover:bg-stone-50 dark:bg-stone-800 dark:text-stone-100 dark:ring-stone-700/60 dark:hover:bg-stone-700'
+    <div
+      className={`flex h-9 w-full items-center justify-center rounded-lg transition-colors appearance-none ${
+        editing
+          ? 'bg-stone-100 px-2 dark:bg-stone-800'
+          : isEmpty
+            ? 'bg-stone-100 text-stone-400 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-500 dark:hover:bg-stone-700'
+            : 'bg-white text-stone-800 ring-1 ring-stone-300/80 hover:bg-stone-50 dark:bg-stone-800 dark:text-stone-100 dark:ring-stone-600/80 dark:hover:bg-stone-700'
       }`}
     >
-      {formatSeconds(value)}
-    </button>
+      <input
+        ref={inputRef}
+        type="text"
+        readOnly={!editing}
+        value={editing ? draft : formatSeconds(value)}
+        onClick={startEdit}
+        onFocus={startEdit}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={handleKeyDown}
+        placeholder={editing ? 'm:ss' : '—'}
+        inputMode={editing ? 'numeric' : undefined}
+        autoComplete="off"
+        enterKeyHint="done"
+        className={`block w-full min-w-0 touch-manipulation appearance-none border-0 bg-transparent text-center outline-none focus:outline-none focus:ring-0 font-mono text-sm leading-5 font-semibold tabular-nums ${
+          editing ? 'text-stone-800 dark:text-stone-100' : ''
+        }`}
+        style={editing ? INPUT_RESET_STYLE : INPUT_READONLY_STYLE}
+      />
+    </div>
   );
 }
 
@@ -252,7 +250,7 @@ const ProgressRow = forwardRef<HTMLTableRowElement, RowProps>(function ProgressR
   return (
     <tr
       ref={ref}
-      className={`border-b border-stone-200/70 transition-colors dark:border-stone-700/60 ${
+      className={`border-b border-stone-300 transition-colors dark:border-stone-700 ${
         isToday
           ? 'bg-amber-50/60 dark:bg-amber-950/20'
           : 'hover:bg-stone-50/60 dark:hover:bg-stone-900/40'
@@ -287,7 +285,7 @@ const ProgressRow = forwardRef<HTMLTableRowElement, RowProps>(function ProgressR
         return (
           <td
             key={user.id}
-            className="border-l border-stone-200/80 p-0 align-middle dark:border-stone-700/70"
+            className="border-l border-stone-300 p-0 align-middle dark:border-stone-600"
           >
             <ResultCell
               value={value}
@@ -303,19 +301,17 @@ const ProgressRow = forwardRef<HTMLTableRowElement, RowProps>(function ProgressR
 
 // One card per day for the mobile (<md) layout — shows the date, weekday,
 // and one button per user stacked vertically.
-function DayCard({
-  date,
-  dateISO,
-  isToday,
-  progress,
-  onSetResult,
-}: RowProps) {
+const DayCard = forwardRef<HTMLDivElement, RowProps>(function DayCard(
+  { date, dateISO, isToday, progress, onSetResult },
+  ref,
+) {
   return (
     <div
+      ref={ref}
       className={`rounded-xl border p-3 transition-colors ${
         isToday
-          ? 'border-amber-200/70 bg-amber-50/60 dark:border-amber-800/60 dark:bg-amber-950/20'
-          : 'border-stone-200/70 bg-white dark:border-stone-800 dark:bg-stone-900'
+          ? 'border-amber-300/80 bg-amber-50/60 dark:border-amber-700/70 dark:bg-amber-950/20'
+          : 'border-stone-300/80 bg-white dark:border-stone-700/80 dark:bg-stone-900'
       }`}
     >
       <div className="mb-2 flex items-baseline justify-between">
@@ -365,54 +361,99 @@ function DayCard({
       </div>
     </div>
   );
-}
+});
 
 export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
   const dates = generateYearDates(progress.year);
   const today = todayISO();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const todayRowRef = useRef<HTMLTableRowElement | null>(null);
-  const didInitialScroll = useRef(false);
+  const todayCardRef = useRef<HTMLDivElement | null>(null);
 
-  // Scroll the today row to the centre of the inner scroll container on first
-  // mount. `scrollIntoView` walks up to the nearest scrollable ancestor, which
-  // is the overflow-auto div that wraps the table.
+  // Scroll today's row / card to the centre of its scroll container on first
+  // mount. We branch by viewport so the hidden layout doesn't get queried:
+  //   - Desktop (>= md): the row lives inside the inner overflow-auto div, so
+  //     we adjust container.scrollTop to centre the row vertically.
+  //   - Mobile (< md): cards are stacked in the page itself, so we scroll
+  //     document.scrollingElement explicitly.
+  // On mobile the address bar collapses after first paint, which reflows the
+  // viewport and resets scroll to top — so we re-assert the scroll a few
+  // times across the first ~1.5s. Each attempt overrides the previous one,
+  // so a stale scroll from an earlier tick is replaced by a fresh one.
   useEffect(() => {
-    if (didInitialScroll.current) return;
-    if (!todayRowRef.current) return;
-    didInitialScroll.current = true;
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
 
-    // Defer one frame so layout has settled before we read positions.
-    const raf = requestAnimationFrame(() => {
-      const row = todayRowRef.current;
-      const container = scrollContainerRef.current;
-      if (!row || !container) return;
+    let cancelled = false;
 
-      const containerHeight = container.clientHeight;
-      const rowTop = row.offsetTop;
-      const rowHeight = row.offsetHeight;
-      const target = Math.max(0, rowTop - (containerHeight - rowHeight) / 2);
-      container.scrollTop = target;
-    });
+    const tryScroll = (): void => {
+      if (cancelled) return;
 
-    return () => cancelAnimationFrame(raf);
+      const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+
+      if (isDesktop) {
+        const row = todayRowRef.current;
+        const container = scrollContainerRef.current;
+        if (row && container) {
+          const containerHeight = container.clientHeight;
+          const rowTop = row.offsetTop;
+          const rowHeight = row.offsetHeight;
+          if (rowHeight > 0 && containerHeight > 0) {
+            const target = Math.max(0, rowTop - (containerHeight - rowHeight) / 2);
+            container.scrollTop = target;
+          }
+        }
+      } else {
+        const card = todayCardRef.current;
+        if (card) {
+          const rect = card.getBoundingClientRect();
+          if (rect.height > 0) {
+            const absoluteTop = window.scrollY + rect.top;
+            const target = absoluteTop - (window.innerHeight - rect.height) / 2;
+            const clamped = Math.max(0, target);
+            // Write to both documentElement and body — covers standards and
+            // quirks mode and is robust across mobile browsers.
+            document.documentElement.scrollTop = clamped;
+            document.body.scrollTop = clamped;
+          }
+        }
+      }
+    };
+
+    const rafId = requestAnimationFrame(tryScroll);
+    const onLoad = () => tryScroll();
+    window.addEventListener('load', onLoad);
+    // Cover address-bar collapse (~300-500ms after load) and the late layout
+    // shift that follows (~1-1.5s). Each one re-asserts today so any reset
+    // back to top in between is undone.
+    const t1 = window.setTimeout(tryScroll, 400);
+    const t2 = window.setTimeout(tryScroll, 1200);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('load', onLoad);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
   }, []);
 
   return (
     <>
       {/* Desktop / tablet: classic table. */}
-      <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-stone-200/70 md:block dark:bg-stone-950 dark:ring-stone-700/70">
+      <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-stone-300/80 md:block dark:bg-stone-950 dark:ring-stone-600/80">
         <div ref={scrollContainerRef} className="max-h-[70vh] overflow-auto">
           <table className="w-full min-w-[480px] border-collapse text-sm">
             <thead className="sticky top-0 z-20 bg-stone-50/95 backdrop-blur dark:bg-stone-900/95">
-              <tr className="border-b border-stone-200 dark:border-stone-700">
+              <tr className="border-b border-stone-300 dark:border-stone-600">
                 <th className="sticky left-0 z-30 bg-stone-50/95 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500 dark:bg-stone-900/95 dark:text-stone-400">
                   Date
                 </th>
                 {USERS.map((user) => (
                   <th
                     key={user.id}
-                    className="border-l border-stone-200 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-stone-700 dark:border-stone-700 dark:text-stone-200"
+                    className="border-l border-stone-300 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-stone-700 dark:border-stone-600 dark:text-stone-200"
                   >
                     <div className="flex items-center justify-center gap-2">
                       <span
@@ -452,6 +493,7 @@ export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
           return (
             <DayCard
               key={dateISO}
+              ref={dateISO === today ? todayCardRef : undefined}
               date={date}
               dateISO={dateISO}
               isToday={dateISO === today}
