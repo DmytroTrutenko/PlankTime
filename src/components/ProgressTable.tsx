@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { TextField } from '@mui/material';
 import type { KeyboardEvent } from 'react';
 
 import { USERS } from '../config/users';
@@ -20,20 +19,24 @@ interface ProgressTableProps {
   onSetResult: (userId: UserId, dateISO: string, seconds: number | null) => void;
 }
 
-interface CellProps {
-  value: number | null;
-  accent: string;
-  onSave: (seconds: number | null) => void;
-}
+// Shared input styling — locked dimensions, 16px font (prevents iOS zoom),
+// no outline/transform so the field can never visually expand on focus.
+const INPUT_CLASS =
+  'w-full bg-transparent text-center font-mono text-stone-900 placeholder:text-stone-300 ' +
+  'outline-none focus:outline-none focus:ring-0 ' +
+  'dark:text-stone-100 dark:placeholder:text-stone-600';
 
-const ACCENT_BG_HOVER: Record<string, string> = {
-  sky: 'hover:bg-sky-50/70 focus-within:bg-sky-50 dark:hover:bg-sky-900/30 dark:focus-within:bg-sky-900/40',
-  rose: 'hover:bg-rose-50/70 focus-within:bg-rose-50 dark:hover:bg-rose-900/30 dark:focus-within:bg-rose-900/40',
+const INPUT_STYLE: React.CSSProperties = {
+  fontSize: '16px',
+  lineHeight: 1.2,
+  padding: '0',
+  border: 'none',
+  boxShadow: 'none',
 };
 
-const ACCENT_RING_FOCUS: Record<string, string> = {
-  sky: 'ring-sky-300/70 dark:ring-sky-700/70',
-  rose: 'ring-rose-300/70 dark:ring-rose-700/70',
+const ACCENT_BG_HOVER: Record<string, string> = {
+  sky: 'hover:bg-sky-50 focus-within:bg-sky-50 dark:hover:bg-sky-950/40 dark:focus-within:bg-sky-950/50',
+  rose: 'hover:bg-rose-50 focus-within:bg-rose-50 dark:hover:bg-rose-950/40 dark:focus-within:bg-rose-950/50',
 };
 
 const ACCENT_DOT: Record<string, string> = {
@@ -45,6 +48,12 @@ const ACCENT_LABEL: Record<string, string> = {
   sky: 'text-sky-700 dark:text-sky-300',
   rose: 'text-rose-700 dark:text-rose-300',
 };
+
+interface CellProps {
+  value: number | null;
+  accent: string;
+  onSave: (seconds: number | null) => void;
+}
 
 function ResultCell({ value, accent, onSave }: CellProps) {
   const [editing, setEditing] = useState(false);
@@ -64,8 +73,7 @@ function ResultCell({ value, accent, onSave }: CellProps) {
   };
 
   const commit = () => {
-    const parsed = parseTimeInput(draft);
-    onSave(parsed);
+    onSave(parseTimeInput(draft));
     setEditing(false);
   };
 
@@ -93,8 +101,8 @@ function ResultCell({ value, accent, onSave }: CellProps) {
         <span
           className={`font-mono tabular-nums transition-colors ${
             value == null
-              ? 'text-slate-300 group-hover:text-slate-400 dark:text-slate-600 dark:group-hover:text-slate-500'
-              : 'font-semibold text-slate-800 dark:text-slate-100'
+              ? 'text-stone-300 group-hover:text-stone-400 dark:text-stone-600 dark:group-hover:text-stone-500'
+              : 'font-semibold text-stone-800 dark:text-stone-100'
           }`}
         >
           {formatSeconds(value)}
@@ -105,39 +113,21 @@ function ResultCell({ value, accent, onSave }: CellProps) {
 
   return (
     <div
-      className={`flex h-full w-full items-center justify-center px-1 py-1 ring-2 ring-inset transition-shadow ${ACCENT_RING_FOCUS[accent] ?? 'ring-slate-300/70'}`}
+      className={`flex h-full w-full items-center justify-center px-2 py-1 transition-colors ${ACCENT_BG_HOVER[accent] ?? 'bg-stone-50 dark:bg-stone-900/40'}`}
     >
-      <TextField
-        inputRef={inputRef}
+      <input
+        ref={inputRef}
+        type="text"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
         placeholder="m:ss"
-        variant="standard"
-        size="small"
-        inputProps={{
-          // 16px prevents iOS Safari from auto-zooming the viewport on focus.
-          inputMode: 'numeric',
-          autoComplete: 'off',
-          enterKeyHint: 'done',
-        }}
-        sx={{
-          width: '100%',
-          '& .MuiInput-input': {
-            padding: '2px 4px',
-            fontSize: '16px',
-            lineHeight: 1.2,
-            textAlign: 'center',
-            fontFamily: 'ui-monospace, SFMono-Regular, monospace',
-            color: 'inherit',
-          },
-          '& .MuiInput-underline:before': { borderBottom: 'none' },
-          '& .MuiInput-underline:after': { borderBottom: 'none' },
-          '& .MuiInput-underline:hover:not(.Mui-disabled):before': {
-            borderBottom: 'none',
-          },
-        }}
+        inputMode="numeric"
+        autoComplete="off"
+        enterKeyHint="done"
+        className={INPUT_CLASS}
+        style={INPUT_STYLE}
       />
     </div>
   );
@@ -145,13 +135,9 @@ function ResultCell({ value, accent, onSave }: CellProps) {
 
 // Compact button that doubles as a display + tap-to-edit field for the mobile cards.
 function CompactResultCell({
-  userId,
-  dateISO,
   value,
   onSave,
 }: {
-  userId: UserId;
-  dateISO: string;
   value: number | null;
   onSave: (seconds: number | null) => void;
 }) {
@@ -190,49 +176,34 @@ function CompactResultCell({
 
   if (editing) {
     return (
-      <TextField
-        inputRef={inputRef}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={handleKeyDown}
-        placeholder="m:ss"
-        variant="standard"
-        size="small"
-        autoFocus
-        inputProps={{
-          inputMode: 'numeric',
-          autoComplete: 'off',
-          enterKeyHint: 'done',
-        }}
-        sx={{
-          width: '100%',
-          '& .MuiInput-input': {
-            padding: '2px 4px',
-            fontSize: '16px',
-            lineHeight: 1.2,
-            textAlign: 'center',
-            fontFamily: 'ui-monospace, SFMono-Regular, monospace',
-            color: 'inherit',
-          },
-          '& .MuiInput-underline:before': { borderBottom: 'none' },
-          '& .MuiInput-underline:after': { borderBottom: 'none' },
-        }}
-      />
+      <div className="flex h-9 w-full items-center justify-center rounded-lg bg-stone-100 px-2 dark:bg-stone-800">
+        <input
+          ref={inputRef}
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={handleKeyDown}
+          placeholder="m:ss"
+          inputMode="numeric"
+          autoComplete="off"
+          enterKeyHint="done"
+          autoFocus
+          className={INPUT_CLASS}
+          style={INPUT_STYLE}
+        />
+      </div>
     );
   }
 
-  // Suppress unused-var warning by referencing userId/dateISO for the key.
-  void userId;
-  void dateISO;
   return (
     <button
       type="button"
       onClick={startEdit}
       className={`flex h-9 w-full items-center justify-center rounded-lg font-mono text-sm tabular-nums transition-colors ${
         value == null
-          ? 'bg-slate-100 text-slate-400 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:hover:bg-slate-700'
-          : `bg-white font-semibold text-slate-800 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700`
+          ? 'bg-stone-100 text-stone-400 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-500 dark:hover:bg-stone-700'
+          : `bg-white font-semibold text-stone-800 ring-1 ring-stone-200/70 hover:bg-stone-50 dark:bg-stone-800 dark:text-stone-100 dark:ring-stone-700/60 dark:hover:bg-stone-700`
       }`}
     >
       {formatSeconds(value)}
@@ -251,30 +222,30 @@ interface RowProps {
 function ProgressRow({ date, dateISO, isToday, progress, onSetResult }: RowProps) {
   return (
     <tr
-      className={`border-b border-slate-100 transition-colors dark:border-slate-800 ${
+      className={`border-b border-stone-100 transition-colors dark:border-stone-800/60 ${
         isToday
-          ? 'bg-amber-50/60 dark:bg-amber-900/20'
-          : 'hover:bg-slate-50/60 dark:hover:bg-slate-800/40'
+          ? 'bg-amber-50/60 dark:bg-amber-950/20'
+          : 'hover:bg-stone-50/60 dark:hover:bg-stone-900/40'
       }`}
     >
       <td className="sticky left-0 z-10 bg-inherit px-3 py-1.5">
         <div className="flex items-baseline gap-2">
           <span
             className={`font-medium ${
-              isToday ? 'text-amber-900 dark:text-amber-200' : 'text-slate-800 dark:text-slate-100'
+              isToday ? 'text-amber-900 dark:text-amber-200' : 'text-stone-800 dark:text-stone-100'
             }`}
           >
             {formatDateDisplay(date)}
           </span>
           <span
             className={`text-xs ${
-              isToday ? 'text-amber-700 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'
+              isToday ? 'text-amber-700 dark:text-amber-400' : 'text-stone-500 dark:text-stone-400'
             }`}
           >
             {formatWeekday(date)}
           </span>
           {isToday && (
-            <span className="ml-1 rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-900 dark:bg-amber-700 dark:text-amber-100">
+            <span className="ml-1 rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-900 dark:bg-amber-800 dark:text-amber-100">
               today
             </span>
           )}
@@ -284,7 +255,10 @@ function ProgressRow({ date, dateISO, isToday, progress, onSetResult }: RowProps
       {USERS.map((user) => {
         const value = getResult(progress, user.id, dateISO);
         return (
-          <td key={user.id} className="border-l border-slate-100 p-0 align-middle dark:border-slate-800">
+          <td
+            key={user.id}
+            className="border-l border-stone-100 p-0 align-middle dark:border-stone-800/60"
+          >
             <ResultCell
               value={value}
               accent={user.accent}
@@ -310,29 +284,29 @@ function DayCard({
     <div
       className={`rounded-xl border p-3 transition-colors ${
         isToday
-          ? 'border-amber-200 bg-amber-50/60 dark:border-amber-700/60 dark:bg-amber-900/20'
-          : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
+          ? 'border-amber-200/70 bg-amber-50/60 dark:border-amber-800/60 dark:bg-amber-950/20'
+          : 'border-stone-200/70 bg-white dark:border-stone-800 dark:bg-stone-900'
       }`}
     >
       <div className="mb-2 flex items-baseline justify-between">
         <div className="flex items-baseline gap-2">
           <span
             className={`text-sm font-medium ${
-              isToday ? 'text-amber-900 dark:text-amber-200' : 'text-slate-800 dark:text-slate-100'
+              isToday ? 'text-amber-900 dark:text-amber-200' : 'text-stone-800 dark:text-stone-100'
             }`}
           >
             {formatDateDisplay(date)}
           </span>
           <span
             className={`text-xs ${
-              isToday ? 'text-amber-700 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'
+              isToday ? 'text-amber-700 dark:text-amber-400' : 'text-stone-500 dark:text-stone-400'
             }`}
           >
             {formatWeekday(date)}
           </span>
         </div>
         {isToday && (
-          <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-900 dark:bg-amber-700 dark:text-amber-100">
+          <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-900 dark:bg-amber-800 dark:text-amber-100">
             today
           </span>
         )}
@@ -343,13 +317,15 @@ function DayCard({
           const value = getResult(progress, user.id, dateISO);
           return (
             <div key={user.id} className="flex items-center gap-2">
-              <span className={`flex w-16 items-center gap-1.5 text-xs font-medium ${ACCENT_LABEL[user.accent] ?? ''}`}>
-                <span className={`inline-block h-2 w-2 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-slate-400'}`} />
+              <span
+                className={`flex w-16 items-center gap-1.5 text-xs font-medium ${ACCENT_LABEL[user.accent] ?? ''}`}
+              >
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-stone-400'}`}
+                />
                 {user.name}
               </span>
               <CompactResultCell
-                userId={user.id}
-                dateISO={dateISO}
                 value={value}
                 onSave={(seconds) => onSetResult(user.id, dateISO, seconds)}
               />
@@ -368,22 +344,22 @@ export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
   return (
     <>
       {/* Desktop / tablet: classic table. */}
-      <div className="hidden overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700/60 md:block">
+      <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-stone-200/70 md:block dark:bg-stone-950 dark:ring-stone-800/60">
         <div className="max-h-[70vh] overflow-auto">
           <table className="w-full min-w-[480px] border-collapse text-sm">
-            <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur dark:bg-slate-800/95">
-              <tr className="border-b border-slate-200 dark:border-slate-700">
-                <th className="sticky left-0 z-30 bg-slate-50/95 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/95 dark:text-slate-300">
+            <thead className="sticky top-0 z-20 bg-stone-50/95 backdrop-blur dark:bg-stone-900/95">
+              <tr className="border-b border-stone-200 dark:border-stone-800">
+                <th className="sticky left-0 z-30 bg-stone-50/95 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500 dark:bg-stone-900/95 dark:text-stone-400">
                   Date
                 </th>
                 {USERS.map((user) => (
                   <th
                     key={user.id}
-                    className="border-l border-slate-200 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                    className="border-l border-stone-200 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-stone-700 dark:border-stone-800 dark:text-stone-200"
                   >
                     <div className="flex items-center justify-center gap-2">
                       <span
-                        className={`inline-block h-2 w-2 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-slate-400'}`}
+                        className={`inline-block h-2 w-2 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-stone-400'}`}
                       />
                       {user.name}
                     </div>

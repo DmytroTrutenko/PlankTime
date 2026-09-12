@@ -34,8 +34,8 @@ function computeStats(progress: YearProgress, userId: UserId): UserStats {
 }
 
 const ACCENT_RING: Record<string, string> = {
-  sky: 'ring-sky-200 dark:ring-sky-800/60',
-  rose: 'ring-rose-200 dark:ring-rose-800/60',
+  sky: 'ring-sky-200/70 dark:ring-sky-900/50',
+  rose: 'ring-rose-200/70 dark:ring-rose-900/50',
 };
 
 const ACCENT_DOT: Record<string, string> = {
@@ -44,13 +44,13 @@ const ACCENT_DOT: Record<string, string> = {
 };
 
 const ACCENT_STREAK_BG: Record<string, string> = {
-  sky: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200',
-  rose: 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200',
+  sky: 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300',
+  rose: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300',
 };
 
 const ACCENT_STREAK_BG_ACTIVE: Record<string, string> = {
-  sky: 'bg-sky-500 text-white dark:bg-sky-500',
-  rose: 'bg-rose-500 text-white dark:bg-rose-500',
+  sky: 'bg-sky-500 text-white shadow-[0_0_0_3px_rgb(14,165,233,0.18)] dark:bg-sky-500 dark:shadow-[0_0_0_3px_rgb(14,165,233,0.28)]',
+  rose: 'bg-rose-500 text-white shadow-[0_0_0_3px_rgb(244,63,94,0.18)] dark:bg-rose-500 dark:shadow-[0_0_0_3px_rgb(244,63,94,0.28)]',
 };
 
 export function SummaryBar({ progress }: SummaryBarProps) {
@@ -62,28 +62,29 @@ export function SummaryBar({ progress }: SummaryBarProps) {
         return (
           <div
             key={user.id}
-            className={`rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 transition-shadow hover:shadow-md dark:bg-slate-900 dark:ring-slate-700/60 ${ACCENT_RING[user.accent] ?? ''}`}
+            className={`rounded-2xl bg-white p-4 shadow-soft ring-1 transition-shadow hover:shadow-lift dark:bg-stone-950 dark:ring-stone-800/60 ${ACCENT_RING[user.accent] ?? 'ring-stone-200/70 dark:ring-stone-800/60'}`}
           >
             <header className="mb-3 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className={`inline-block h-2.5 w-2.5 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-slate-400'}`} />
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
+                <span className={`inline-block h-2.5 w-2.5 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-stone-400'}`} />
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-700 dark:text-stone-200">
                   {user.name}
                 </h2>
               </div>
               <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums transition-colors ${
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tabular-nums transition-colors ${
                   streakActive
-                    ? ACCENT_STREAK_BG_ACTIVE[user.accent] ?? 'bg-slate-700 text-white'
-                    : ACCENT_STREAK_BG[user.accent] ?? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    ? ACCENT_STREAK_BG_ACTIVE[user.accent] ?? 'bg-stone-800 text-white'
+                    : ACCENT_STREAK_BG[user.accent] ?? 'bg-stone-100 text-stone-500 dark:bg-stone-900 dark:text-stone-400'
                 }`}
                 title={streakActive ? 'Consecutive days ending today' : 'No active streak'}
               >
-                🔥 {stats.streak}d
+                <span className="mr-0.5">🔥</span>
+                {stats.streak}d
               </span>
             </header>
 
-            <dl className="grid grid-cols-3 gap-3 text-center">
+            <dl className="grid grid-cols-3 gap-2 text-center">
               <Stat label="Days" value={String(stats.count)} />
               <Stat label="Best" value={formatSeconds(stats.best)} />
               <Stat label="Average" value={formatSeconds(stats.average)} />
@@ -102,11 +103,11 @@ interface StatProps {
 
 function Stat({ label, value }: StatProps) {
   return (
-    <div className="rounded-xl bg-slate-50 px-2 py-2 dark:bg-slate-800/60">
-      <dt className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+    <div className="rounded-xl bg-stone-50 px-2 py-2 dark:bg-stone-900/70">
+      <dt className="text-[11px] font-medium uppercase tracking-wider text-stone-500 dark:text-stone-400">
         {label}
       </dt>
-      <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-slate-900 dark:text-slate-50">
+      <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-stone-900 dark:text-stone-50">
         {value}
       </dd>
     </div>

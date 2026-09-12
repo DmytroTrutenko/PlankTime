@@ -17,18 +17,19 @@ body {
     'Segoe UI',
     Roboto,
     sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #0f172a;
-  background-color: #f8fafc;
+  color: #18181b;
+  background-color: #faf8f5;
   transition:
     background-color 200ms ease,
     color 200ms ease;
 }
 
 html.dark body {
-  color: #e2e8f0;
-  background-color: #020617;
+  color: #fafaf9;
+  background-color: #0c0a09;
 }
 
 @supports (font-variation-settings: normal) {
@@ -50,4 +51,16 @@ html.dark body {
 
 button {
   font-family: inherit;
+}
+
+/* Stable inputs: prevent any browser-default focus expansion. */
+input,
+textarea,
+button {
+  outline: none;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
 }
