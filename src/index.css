@@ -21,6 +21,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
   color: #0f172a;
   background-color: #f8fafc;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+html.dark body {
+  color: #e2e8f0;
+  background-color: #020617;
 }
 
 @supports (font-variation-settings: normal) {
