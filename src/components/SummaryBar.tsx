@@ -84,14 +84,10 @@ export function SummaryBar({ progress }: SummaryBarProps) {
               </span>
             </header>
 
-            <dl className="grid grid-cols-2 gap-1 text-center sm:grid-cols-3 sm:gap-2">
+            <dl className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-2">
               <Stat label="Days" value={String(stats.count)} />
               <Stat label="Best" value={formatSeconds(stats.best)} />
-              <Stat
-                label="Average"
-                value={formatSeconds(stats.average)}
-                className="col-span-2 sm:col-span-1"
-              />
+              <Stat label="Average" value={formatSeconds(stats.average)} />
             </dl>
           </div>
         );
@@ -108,11 +104,11 @@ interface StatProps {
 
 function Stat({ label, value, className = '' }: StatProps) {
   return (
-    <div className={`min-w-0 overflow-hidden rounded-xl bg-stone-50 px-0.5 py-1.5 sm:px-2 sm:py-2 dark:bg-stone-900/70 ${className}`}>
-      <dt className="truncate text-[9px] font-medium uppercase tracking-wider text-stone-500 sm:text-[11px] dark:text-stone-400">
+    <div className={`flex items-center justify-between gap-2 rounded-xl bg-stone-50 px-2.5 py-1.5 sm:flex-col sm:justify-center sm:gap-0 sm:px-2 sm:py-2 dark:bg-stone-900/70 ${className}`}>
+      <dt className="text-[10px] font-medium uppercase tracking-wider text-stone-500 sm:mt-0 sm:text-[11px] dark:text-stone-400">
         {label}
       </dt>
-      <dd className="mt-0.5 truncate font-mono text-[11px] font-semibold tabular-nums text-stone-900 sm:mt-1 sm:text-sm dark:text-stone-50">
+      <dd className="font-mono text-sm font-semibold tabular-nums text-stone-900 sm:mt-1 dark:text-stone-50">
         {value}
       </dd>
     </div>
