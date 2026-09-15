@@ -154,13 +154,19 @@ function ResultCell({ value, accent, onSave }: CellProps) {
 
 // Hard reset on the input — guarantees no UA default outline / border /
 // shadow / padding / background leaks in and shifts the layout on focus.
-// font-size 14px matches Tailwind's `text-sm` so the rendered glyphs sit at
-// the same baseline as the <span> shown in display mode. `color: 'inherit'`
-// is defensive: with Tailwind's preflight disabled here, some browsers apply
-// their own (sometimes white-on-white) UA colour to <input> that can override
-// utility classes in the cascade.
+// `font-size: 16px` is the minimum iOS Safari / Android Chrome accept
+// without auto-zooming the viewport when the input is focused. We render
+// the input always (never readOnly), so any smaller font would cause the
+// page to zoom in on tap and stay zoomed after blur — `font-size` must
+// be ≥ 16 px on the element that receives focus, not just on a wrapper.
+// `line-height: 20px` matches Tailwind's `leading-5` so the row geometry
+// is identical to a plain text-sm cell even though the digits render
+// slightly larger. `color: 'inherit'` is defensive: with Tailwind's
+// preflight disabled here, some browsers apply their own (sometimes
+// white-on-white) UA colour to <input> that can override utility classes
+// in the cascade.
 const INPUT_RESET_STYLE: CSSProperties = {
-  fontSize: '14px',
+  fontSize: '16px',
   lineHeight: '20px',
   padding: '0',
   margin: '0',
@@ -173,8 +179,8 @@ const INPUT_RESET_STYLE: CSSProperties = {
   appearance: 'none',
 };
 
-// Same reset, but with the caret hidden so a readOnly input visually looks
-// like plain text instead of an input that can blink / receive focus rings.
+// Same reset, but with the caret hidden so the input visually looks like
+// plain text instead of an input that can blink / receive focus rings.
 const INPUT_READONLY_STYLE: CSSProperties = {
   ...INPUT_RESET_STYLE,
   caretColor: 'transparent',
