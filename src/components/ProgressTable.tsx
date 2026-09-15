@@ -111,22 +111,29 @@ function ResultCell({ value, accent, onSave }: CellProps) {
       <input
         ref={inputRef}
         type="text"
-        readOnly={!editing}
         value={editing ? draft : valueText}
-        onClick={startEdit}
         onFocus={startEdit}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
         placeholder={editing ? 'min or m:ss' : '—'}
-        inputMode={editing ? 'numeric' : undefined}
+        inputMode="numeric"
         autoComplete="off"
         enterKeyHint="done"
-        // `touch-action: manipulation` removes the 300 ms tap delay and stops
-        // double-tap zoom on mobile so the cell never grows on tap. Colour is
-        // intentionally NOT set here — it comes from the wrapper above via
-        // `color: inherit` in INPUT_RESET_STYLE so UA <input> styles can't
-        // override it.
+        // No `readOnly` — iOS Safari / Android Chrome will NOT show the
+        // virtual keyboard for a readOnly input, even if we toggle it off
+        // synchronously in `startEdit`: the focus event has already fired by
+        // the time React re-renders with the new state, and `.focus()` on an
+        // already-focused node does not re-trigger the keyboard. Keeping the
+        // input always editable makes tap → focus → keyboard happen in a
+        // single gesture on mobile. Visual "not an input" look in display
+        // mode is preserved via the wrapper's styles + `caret-color:
+        // transparent` on the input itself.
+        // `touch-action: manipulation` removes the 300 ms tap delay and
+        // stops double-tap zoom on mobile so the cell never grows on tap.
+        // Colour is intentionally NOT set here — it comes from the wrapper
+        // above via `color: inherit` in INPUT_RESET_STYLE so UA <input>
+        // styles can't override it.
         className={
           'block w-full min-w-0 touch-manipulation appearance-none border-0 bg-transparent text-center ' +
           'outline-none focus:outline-none focus:ring-0 ' +
@@ -168,9 +175,13 @@ const INPUT_READONLY_STYLE: CSSProperties = {
 };
 
 // Compact button that doubles as a display + tap-to-edit field for the mobile cards.
-// Same always-render-input pattern as the desktop cell: a single <input> toggles
-// readOnly on focus, so the element type never changes between display and edit
-// states — no width / height jump on focus.
+// Same always-render-input pattern as the desktop cell: a single <input> is
+// always rendered and always editable — swapping between display and edit
+// states only swaps the wrapper's background and the input's caret, so the
+// element type never changes between states — no width / height jump on focus.
+// Keeping the input always editable is required for the mobile virtual
+// keyboard to actually appear on tap (iOS Safari will not show the keyboard
+// for readOnly inputs).
 function CompactResultCell({
   value,
   onSave,
@@ -230,17 +241,19 @@ function CompactResultCell({
       <input
         ref={inputRef}
         type="text"
-        readOnly={!editing}
         value={editing ? draft : formatSeconds(value)}
-        onClick={startEdit}
         onFocus={startEdit}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
         placeholder={editing ? 'min or m:ss' : '—'}
-        inputMode={editing ? 'numeric' : undefined}
+        inputMode="numeric"
         autoComplete="off"
         enterKeyHint="done"
+        // No `readOnly` — same iOS Safari / Android Chrome issue as the
+        // desktop cell: virtual keyboards never appear for readOnly inputs,
+        // even if we toggle it off in the same tap. Keeping the input
+        // always editable makes tap → focus → keyboard a single gesture.
         // Colour is intentionally NOT set here — it comes from the wrapper
         // above via `color: inherit` in INPUT_RESET_STYLE so UA <input>
         // styles can't override it.
