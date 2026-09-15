@@ -124,7 +124,11 @@ export function formatSeconds(totalSeconds: number | null | undefined): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
-const TIME_INPUT_PATTERN = /^\d{1,4}(:\d{1,2}){0,2}$/;
+// Accept `:`, `.`, and `,` as the m:ss separator so the mobile numeric /
+// decimal keypad (`inputMode="decimal"` on iOS Safari and Android Chrome
+// only exposes the locale's decimal separator — typically `.` or `,` —
+// and has no `:` key) can be used to type a time.
+const TIME_INPUT_PATTERN = /^\d{1,4}([.:,]\d{1,2}){0,2}$/;
 
 export function parseTimeInput(input: string): number | null {
   const trimmed = input.trim();
@@ -132,7 +136,7 @@ export function parseTimeInput(input: string): number | null {
 
   if (!TIME_INPUT_PATTERN.test(trimmed)) return null;
 
-  const parts = trimmed.split(':').map((p) => Number.parseInt(p, 10));
+  const parts = trimmed.split(/[.:,]/).map((p) => Number.parseInt(p, 10));
   if (parts.some((n) => Number.isNaN(n) || n < 0)) return null;
 
   if (parts.length === 1) {

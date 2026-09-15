@@ -113,11 +113,17 @@ function ResultCell({ value, accent, onSave }: CellProps) {
         type="text"
         value={editing ? draft : valueText}
         onFocus={startEdit}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          // The mobile decimal keypad (inputMode="decimal") only exposes
+          // the locale's decimal separator — `.` in en-US, `,` in de-DE —
+          // and has no `:` key. Normalise to `:` so the user always sees
+          // the canonical m:ss separator while editing.
+          setDraft(e.target.value.replace(/[.,]/g, ':'));
+        }}
         onBlur={commit}
         onKeyDown={handleKeyDown}
         placeholder={editing ? 'min or m:ss' : '—'}
-        inputMode="numeric"
+        inputMode="decimal"
         autoComplete="off"
         enterKeyHint="done"
         // No `readOnly` — iOS Safari / Android Chrome will NOT show the
@@ -243,11 +249,15 @@ function CompactResultCell({
         type="text"
         value={editing ? draft : formatSeconds(value)}
         onFocus={startEdit}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          // Mobile decimal keypad exposes `.` / `,` instead of `:` — see
+          // the matching comment on the desktop cell.
+          setDraft(e.target.value.replace(/[.,]/g, ':'));
+        }}
         onBlur={commit}
         onKeyDown={handleKeyDown}
         placeholder={editing ? 'min or m:ss' : '—'}
-        inputMode="numeric"
+        inputMode="decimal"
         autoComplete="off"
         enterKeyHint="done"
         // No `readOnly` — same iOS Safari / Android Chrome issue as the
