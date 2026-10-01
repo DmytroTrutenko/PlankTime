@@ -1,34 +1,51 @@
+import { useState } from 'react';
+
 import { USERS } from '../config/users';
 import { todayISO } from '../lib/date';
 import {
   ACCENT_DOT,
   ACCENT_RING,
-  ACCENT_STREAK_BG,
   ACCENT_STREAK_BG_ACTIVE,
   FALLBACK_DOT,
   FALLBACK_RING,
-  FALLBACK_STREAK_BG,
   FALLBACK_STREAK_BG_ACTIVE,
 } from '../lib/accent';
-import { currentStreak } from '../lib/progress';
-import type { UserId, YearProgress } from '../types/progress';
+import type { Exercise, UserId, YearProgress } from '../types/progress';
 
 interface SummaryBarProps {
   progress: YearProgress;
-  formatValue: (value: number | null) => string;
+  formatPlank: (value: number | null) => string;
+  formatPushups: (value: number | null) => string;
+  // When set, render only this user's card. Used by the modal so the same
+  // card layout shows for one user inside an overlay without duplicating
+  // the component.
+  userId?: UserId;
 }
 
-interface UserStats {
+const EXERCISE_LABELS: Record<Exercise, string> = {
+  plank: 'Plank',
+  pushups: 'Push-ups',
+};
+
+interface ExerciseStats {
   count: number;
   best: number | null;
   average: number | null;
-  streak: number;
 }
 
-function computeStats(progress: YearProgress, userId: UserId): UserStats {
-  const values = Object.values(progress.entries[userId]);
+function computeStats(
+  progress: YearProgress,
+  userId: UserId,
+  exercise: Exercise,
+): ExerciseStats {
+  const slotMap = progress.entries[userId];
+  const values: number[] = [];
+  for (const slot of Object.values(slotMap)) {
+    const v = slot[exercise];
+    if (v != null) values.push(v);
+  }
   if (values.length === 0) {
-    return { count: 0, best: null, average: null, streak: 0 };
+    return { count: 0, best: null, average: null };
   }
   let sum = 0;
   let best = 0;
@@ -36,75 +53,200 @@ function computeStats(progress: YearProgress, userId: UserId): UserStats {
     sum += v;
     if (v > best) best = v;
   }
-  return {
-    count: values.length,
-    best,
-    average: Math.round(sum / values.length),
-    streak: currentStreak(progress, userId, todayISO()),
-  };
+  return { count: values.length, best, average: Math.round(sum / values.length) };
 }
 
-export function SummaryBar({ progress, formatValue }: SummaryBarProps) {
-  return (
-    <section className="grid grid-cols-2 gap-2 sm:gap-3">
-      {USERS.map((user) => {
-        const stats = computeStats(progress, user.id);
-        const streakActive = stats.streak > 0;
-        const dotClass = ACCENT_DOT[user.accent] ?? FALLBACK_DOT;
-        const ringClass = ACCENT_RING[user.accent] ?? FALLBACK_RING;
-        const streakBg = streakActive
-          ? (ACCENT_STREAK_BG_ACTIVE[user.accent] ?? FALLBACK_STREAK_BG_ACTIVE)
-          : (ACCENT_STREAK_BG[user.accent] ?? FALLBACK_STREAK_BG);
-        return (
-          <div
-            key={user.id}
-            className={`min-w-0 rounded-2xl bg-white p-2.5 shadow-soft ring-1 transition-shadow hover:shadow-lift sm:p-4 dark:bg-stone-950 dark:ring-stone-800/60 ${ringClass}`}
-          >
-            <header className="mb-2 flex items-center justify-between gap-2 sm:mb-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
-                <h2 className="truncate text-sm font-semibold uppercase tracking-wide text-stone-700 dark:text-stone-200">
-                  {user.name}
-                </h2>
-              </div>
-              <span
-                className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none tabular-nums transition-colors sm:px-2.5 ${streakBg}`}
-                title={streakActive ? 'Consecutive days ending today' : 'No active streak'}
-              >
-                <span aria-hidden="true">🔥</span>
-                {stats.streak}d
-              </span>
-            </header>
+// Streak badge uses a single (combined) streak — the longest run of days
+// where the user logged either exercise. Counting per-exercise would give
+// two independent streaks, which adds height without adding motivation
+// ("did I plank today?" is the question the bar answers).
+function dailyStreak(progress: YearProgress, userId: UserId, todayISO: string): number {
+  const entries = progress.entries[userId];
+  const today = new Date(`${todayISO}T00:00:00`);
+  let streak = 0;
+  const cursor = new Date(today);
 
-            <dl className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-2">
-              <Stat label="Days" value={String(stats.count)} />
-              <Stat label="Best" value={formatValue(stats.best)} />
-              <Stat label="Average" value={formatValue(stats.average)} />
-            </dl>
+  const hasEntry = (d: Date) => {
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const slot = entries[iso];
+    return slot != null && (slot.plank != null || slot.pushups != null);
+  };
+
+  // Skip today if missing, but only once.
+  if (!hasEntry(cursor)) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!hasEntry(cursor)) return 0;
+  }
+
+  while (hasEntry(cursor)) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+// Single 3-column grid shared between the table header row and every metric
+// row so the "Plank / Push-ups" columns line up perfectly with their values
+// and the metric labels (Days / Best / Avg) sit in a dedicated gutter column.
+const TABLE_GRID = 'grid grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)]';
+
+interface UserCardProps {
+  userName: string;
+  accentDot: string;
+  ringClass: string;
+  streakBg: string;
+  streak: number;
+  plankStats: ExerciseStats;
+  pushupsStats: ExerciseStats;
+  formatPlank: (value: number | null) => string;
+  formatPushups: (value: number | null) => string;
+}
+
+function UserCard({
+  userName,
+  accentDot,
+  ringClass,
+  streakBg,
+  streak,
+  plankStats,
+  pushupsStats,
+  formatPlank,
+  formatPushups,
+}: UserCardProps) {
+  const [expanded, setExpanded] = useState(true);
+  const streakActive = streak > 0;
+  const contentId = `summary-${userName}`;
+
+  return (
+    <div
+      className={`relative min-w-0 overflow-hidden rounded-2xl bg-white shadow-lift ring-1 transition-all duration-200 dark:bg-stone-950 dark:ring-stone-800 ${ringClass}`}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-controls={contentId}
+        className="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left transition-colors hover:bg-stone-50 dark:hover:bg-stone-900/60"
+      >
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className={`inline-block h-3 w-3 shrink-0 rounded-full ring-2 ring-white dark:ring-stone-950 ${accentDot}`}
+          />
+          <h2 className="truncate text-base font-semibold tracking-tight text-stone-900 dark:text-stone-50">
+            {userName}
+          </h2>
+          <span
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold leading-none tabular-nums transition-colors ${streakBg}`}
+            title={streakActive ? 'Consecutive days ending today' : 'No active streak'}
+          >
+            <span aria-hidden="true">🔥</span>
+            {streak} {streakActive ? (streak === 1 ? 'day' : 'days') : ''}
+          </span>
+        </div>
+        <Chevron
+          className={`shrink-0 text-stone-400 transition-transform duration-200 dark:text-stone-500 ${
+            expanded ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+
+      {expanded && (
+        <div
+          id={contentId}
+          className="border-t border-stone-200 px-4 pb-4 pt-3 dark:border-stone-800"
+        >
+          <div className="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+            <div className={`${TABLE_GRID} gap-x-3 items-center bg-stone-100 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-stone-600 dark:bg-stone-800 dark:text-stone-300`}>
+              {/* Spacer in the label column so the column header sits over
+                  the value columns, not over the metric labels below. */}
+              <div aria-hidden="true" />
+              <div className="border-l border-stone-200 text-center dark:border-stone-800">
+                {EXERCISE_LABELS.plank}
+              </div>
+              <div className="border-l border-stone-200 text-center dark:border-stone-800">
+                {EXERCISE_LABELS.pushups}
+              </div>
+            </div>
+            <div>
+              {(
+                [
+                  { label: 'Days', plank: plankStats.count, pushups: pushupsStats.count, numeric: true },
+                  { label: 'Best', plank: plankStats.best, pushups: pushupsStats.best, numeric: false },
+                  { label: 'Avg', plank: plankStats.average, pushups: pushupsStats.average, numeric: false },
+                ] as const
+              ).map((row, idx) => (
+                <div
+                  key={row.label}
+                  className={`${TABLE_GRID} gap-x-3 items-center border-t border-stone-200 px-3 py-2 text-sm dark:border-stone-800 ${
+                    idx % 2 === 1
+                      ? 'bg-stone-50 dark:bg-stone-800/50'
+                      : ''
+                  }`}
+                >
+                  <div className="text-left text-[11px] font-medium uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                    {row.label}
+                  </div>
+                  <div className="border-l border-stone-200 text-center font-mono font-semibold tabular-nums text-stone-900 dark:border-stone-800 dark:text-stone-50 truncate">
+                    {row.numeric ? String(row.plank) : formatPlank(row.plank)}
+                  </div>
+                  <div className="border-l border-stone-200 text-center font-mono font-semibold tabular-nums text-stone-900 dark:border-stone-800 dark:text-stone-50 truncate">
+                    {row.numeric ? String(row.pushups) : formatPushups(row.pushups)}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        );
-      })}
-    </section>
+        </div>
+      )}
+    </div>
   );
 }
 
-interface StatProps {
-  label: string;
-  value: string;
-  className?: string;
+function Chevron({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      className={`h-4 w-4 ${className}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 7l5 5 5-5" />
+    </svg>
+  );
 }
 
-function Stat({ label, value, className = '' }: StatProps) {
+export function SummaryBar({ progress, formatPlank, formatPushups, userId }: SummaryBarProps) {
+  const today = todayISO();
+  const users = userId ? USERS.filter((u) => u.id === userId) : USERS;
   return (
-    <div
-      className={`flex items-center justify-between gap-2 rounded-xl bg-stone-50 px-2.5 py-1.5 sm:flex-col sm:justify-center sm:gap-0 sm:px-2 sm:py-2 dark:bg-stone-900/70 ${className}`}
-    >
-      <dt className="text-[10px] font-medium uppercase tracking-wider text-stone-500 sm:mt-0 sm:text-[11px] dark:text-stone-400">
-        {label}
-      </dt>
-      <dd className="font-mono text-sm font-semibold tabular-nums text-stone-900 sm:mt-1 dark:text-stone-50">
-        {value}
-      </dd>
-    </div>
+    <section className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
+      {users.map((user) => {
+        const dotClass = ACCENT_DOT[user.accent] ?? FALLBACK_DOT;
+        const ringClass = ACCENT_RING[user.accent] ?? FALLBACK_RING;
+        const streak = dailyStreak(progress, user.id, today);
+        const streakBg =
+          streak > 0
+            ? (ACCENT_STREAK_BG_ACTIVE[user.accent] ?? FALLBACK_STREAK_BG_ACTIVE)
+            : 'bg-stone-200 text-stone-500 dark:bg-stone-800 dark:text-stone-400';
+        return (
+          <UserCard
+            key={user.id}
+            userName={user.name}
+            accentDot={dotClass}
+            ringClass={ringClass}
+            streakBg={streakBg}
+            streak={streak}
+            plankStats={computeStats(progress, user.id, 'plank')}
+            pushupsStats={computeStats(progress, user.id, 'pushups')}
+            formatPlank={formatPlank}
+            formatPushups={formatPushups}
+          />
+        );
+      })}
+    </section>
   );
 }
