@@ -2,14 +2,7 @@ import type { ReactNode } from 'react';
 
 import { USERS } from '../config/users';
 import { todayISO } from '../lib/date';
-import {
-  ACCENT_DOT,
-  ACCENT_RING,
-  ACCENT_STREAK_BG_ACTIVE,
-  FALLBACK_DOT,
-  FALLBACK_RING,
-  FALLBACK_STREAK_BG_ACTIVE,
-} from '../lib/accent';
+import { ACCENT_DOT, ACCENT_RING, FALLBACK_DOT, FALLBACK_RING } from '../lib/accent';
 import { combinedStreak } from '../lib/progress';
 import type { UserId, YearProgress } from '../types/progress';
 
@@ -40,31 +33,21 @@ export function Header({ rightSlot, onOpenSummary, progress }: HeaderProps) {
               const ring = ACCENT_RING[user.accent] ?? FALLBACK_RING;
               const streak = progress ? combinedStreak(progress, user.id, today) : 0;
               const streakActive = streak > 0;
-              const streakBg = streakActive
-                ? (ACCENT_STREAK_BG_ACTIVE[user.accent] ?? FALLBACK_STREAK_BG_ACTIVE)
-                : 'bg-stone-200 text-stone-500 dark:bg-stone-800 dark:text-stone-400';
               return (
                 <button
                   key={user.id}
                   type="button"
                   onClick={() => onOpenSummary(user.id)}
                   aria-label={`Open ${user.name} summary, ${streak} ${streak === 1 ? 'day' : 'days'} streak`}
-                  // Two-tone pill: name on the left in the neutral card colour,
-                  // streak on the right in the user's accent. The seam between
-                  // the two halves is a hard colour break (parent's
-                  // rounded-full + overflow-hidden clips the inner spans to
-                  // the chip's rounded outline).
-                  className={`group inline-flex items-stretch overflow-hidden rounded-full bg-white text-sm font-semibold shadow-soft ring-1 transition-colors hover:bg-stone-50 dark:bg-stone-950 dark:hover:bg-stone-900 ${ring}`}
+                  className={`inline-flex items-center gap-1.5 rounded-full bg-white pl-2.5 pr-3 py-1.5 text-sm font-semibold text-stone-800 shadow-soft ring-1 transition-colors hover:bg-stone-50 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-900 ${ring}`}
                 >
-                  <span className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 text-stone-800 dark:text-stone-100">
-                    <span
-                      aria-hidden="true"
-                      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white dark:ring-stone-950 ${dot}`}
-                    />
-                    {user.name}
-                  </span>
                   <span
-                    className={`inline-flex shrink-0 items-center gap-1 px-2.5 py-1.5 text-sm font-semibold tabular-nums transition-colors ${streakBg}`}
+                    aria-hidden="true"
+                    className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white dark:ring-stone-950 ${dot}`}
+                  />
+                  <span className="truncate">{user.name}</span>
+                  <span
+                    className={`inline-flex shrink-0 items-center gap-0.5 text-sm font-semibold leading-none tabular-nums ${streakActive ? 'text-stone-700 dark:text-stone-200' : 'text-stone-400 dark:text-stone-500'}`}
                     title={streakActive ? `${streak} ${streak === 1 ? 'day' : 'days'} streak` : 'No active streak'}
                   >
                     <span aria-hidden="true">🔥</span>
