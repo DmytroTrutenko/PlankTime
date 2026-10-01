@@ -9,6 +9,12 @@ export interface ResultCellProps {
   onSave: (value: number | null) => void;
   formatValue: (value: number | null) => string;
   parseInput: (input: string) => number | null;
+  // Placeholder shown while the cell is empty in display mode. Used to
+  // identify the exercise (e.g. "Plank" / "Push-ups") so the user knows
+  // what each cell is for without a separate header label.
+  displayPlaceholder: string;
+  // Placeholder shown while editing — usually a format hint like
+  // "min or m:ss" or "reps".
   inputPlaceholder: string;
   // `desktop` is the table-cell layout (no rounded wrapper, accent hover
   // background fills the cell); `compact` is the mobile card layout (rounded
@@ -79,6 +85,7 @@ export function ResultCell({
   onSave,
   formatValue,
   parseInput,
+  displayPlaceholder,
   inputPlaceholder,
   variant,
   ariaLabel,
@@ -170,7 +177,10 @@ export function ResultCell({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
-        placeholder={editing ? inputPlaceholder : '—'}
+        // Display mode shows the exercise name (e.g. "Plank") in place of
+        // the em-dash so an empty cell still tells the user what goes there.
+        // Editing mode swaps to the format hint (e.g. "min or m:ss").
+        placeholder={editing ? inputPlaceholder : displayPlaceholder}
         inputMode="decimal"
         autoComplete="off"
         enterKeyHint="done"

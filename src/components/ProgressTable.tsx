@@ -12,20 +12,33 @@ import { ACCENT_DOT, ACCENT_LABEL, FALLBACK_DOT, type Accent } from '../lib/acce
 import { getResult, monthEntryCount } from '../lib/progress';
 import { ResultCell } from './ResultCell';
 import { ChevronDown, MonthBody, MonthSection, useMonthSection } from './MonthSection';
-import type { UserId, YearProgress } from '../types/progress';
+import type { Exercise, UserId, YearProgress } from '../types/progress';
+
+const EXERCISE_LABELS: Record<Exercise, string> = {
+  plank: 'Plank',
+  pushups: 'Push-ups',
+};
+
+const EXERCISE_PLACEHOLDERS: Record<Exercise, string> = {
+  plank: 'min or m:ss',
+  pushups: 'reps',
+};
 
 interface ProgressTableProps {
   progress: YearProgress;
-  onSetResult: (userId: UserId, dateISO: string, value: number | null) => void;
-  // Display / input formatters. The plank tracker passes time formatters
-  // (`5`, `1:25`, `0:30`); the push-ups tracker passes integer ones. The
-  // cell uses these for both display and edit-draft conversion so swapping
-  // trackers is just two prop changes.
-  formatValue: (value: number | null) => string;
-  parseInput: (input: string) => number | null;
-  inputPlaceholder: string;
-  // Exercise name used in aria-labels (e.g. "plank", "push-ups").
-  exerciseLabel: string;
+  onSetResult: (
+    userId: UserId,
+    dateISO: string,
+    exercise: Exercise,
+    value: number | null,
+  ) => void;
+  // Per-exercise formatters — kept separate so plank renders time and
+  // push-ups render integer reps, but both go through the same ResultCell
+  // and the same column geometry.
+  formatPlank: (value: number | null) => string;
+  formatPushups: (value: number | null) => string;
+  parsePlank: (input: string) => number | null;
+  parsePushups: (input: string) => number | null;
 }
 
 interface RowProps {
@@ -34,11 +47,16 @@ interface RowProps {
   isToday: boolean;
   isPast: boolean;
   progress: YearProgress;
-  onSetResult: (userId: UserId, dateISO: string, value: number | null) => void;
-  formatValue: (value: number | null) => string;
-  parseInput: (input: string) => number | null;
-  inputPlaceholder: string;
-  exerciseLabel: string;
+  onSetResult: (
+    userId: UserId,
+    dateISO: string,
+    exercise: Exercise,
+    value: number | null,
+  ) => void;
+  formatPlank: (value: number | null) => string;
+  formatPushups: (value: number | null) => string;
+  parsePlank: (input: string) => number | null;
+  parsePushups: (input: string) => number | null;
 }
 
 const ProgressRow = forwardRef<HTMLTableRowElement, RowProps>(function ProgressRow(
@@ -49,10 +67,10 @@ const ProgressRow = forwardRef<HTMLTableRowElement, RowProps>(function ProgressR
     isPast,
     progress,
     onSetResult,
-    formatValue,
-    parseInput,
-    inputPlaceholder,
-    exerciseLabel,
+    formatPlank,
+    formatPushups,
+    parsePlank,
+    parsePushups,
   },
   ref,
 ) {
@@ -89,33 +107,39 @@ const ProgressRow = forwardRef<HTMLTableRowElement, RowProps>(function ProgressR
         </div>
       </td>
 
-      {USERS.map((user) => {
-        const value = getResult(progress, user.id, dateISO);
-        return (
-          <td
-            key={user.id}
-            className="border-l border-stone-300 p-0 align-middle dark:border-stone-600"
-          >
-            <ResultCell
-              value={value}
-              accent={user.accent}
-              onSave={(v) => onSetResult(user.id, dateISO, v)}
-              formatValue={formatValue}
-              parseInput={parseInput}
-              inputPlaceholder={inputPlaceholder}
-              variant="desktop"
-              ariaLabel={`${exerciseLabel} result for ${user.name} on ${dateISO}`}
-              disabled={isPast}
-            />
-          </td>
-        );
-      })}
+      {USERS.flatMap((user) =>
+        (['plank', 'pushups'] as const).map((exercise) => {
+          const value = getResult(progress, user.id, dateISO, exercise);
+          const formatValue = exercise === 'plank' ? formatPlank : formatPushups;
+          const parseInput = exercise === 'plank' ? parsePlank : parsePushups;
+          return (
+            <td
+              key={`${user.id}-${exercise}`}
+              className="border-l border-stone-300 p-0 align-middle dark:border-stone-600"
+            >
+              <ResultCell
+                value={value}
+                accent={user.accent}
+                onSave={(v) => onSetResult(user.id, dateISO, exercise, v)}
+                formatValue={formatValue}
+                parseInput={parseInput}
+                displayPlaceholder={EXERCISE_LABELS[exercise]}
+                inputPlaceholder={EXERCISE_PLACEHOLDERS[exercise]}
+                variant="desktop"
+                ariaLabel={`${EXERCISE_LABELS[exercise]} result for ${user.name} on ${dateISO}`}
+                disabled={isPast}
+              />
+            </td>
+          );
+        }),
+      )}
     </tr>
   );
 });
 
-// One card per day for the mobile (<md) layout — shows the date, weekday,
-// and one button per user stacked vertically.
+// One card per day for the mobile (<md) layout. Two compact inputs (Plank +
+// Push-ups) sit side-by-side under the date heading so a user can fill
+// either or both from a single tap.
 const DayCard = forwardRef<HTMLDivElement, RowProps>(function DayCard(
   {
     date,
@@ -124,10 +148,10 @@ const DayCard = forwardRef<HTMLDivElement, RowProps>(function DayCard(
     isPast,
     progress,
     onSetResult,
-    formatValue,
-    parseInput,
-    inputPlaceholder,
-    exerciseLabel,
+    formatPlank,
+    formatPushups,
+    parsePlank,
+    parsePushups,
   },
   ref,
 ) {
@@ -165,36 +189,55 @@ const DayCard = forwardRef<HTMLDivElement, RowProps>(function DayCard(
       </div>
 
       <div className="space-y-1.5">
-        {USERS.map((user) => {
-          const value = getResult(progress, user.id, dateISO);
-          return (
-            <div key={user.id} className="flex items-center gap-2">
+        {/* One shared header row per day so the two compact inputs below are
+            labelled Plank / Push-ups without repeating the labels inside
+            every cell. The w-16 spacer + grid-cols-2 gap-1.5 mirror the
+            user-row geometry below so the labels line up over their inputs. */}
+        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+          <div className="w-16 shrink-0" aria-hidden="true" />
+          <div className="grid flex-1 grid-cols-2 gap-1.5">
+            <div className="text-center">{EXERCISE_LABELS.plank}</div>
+            <div className="text-center">{EXERCISE_LABELS.pushups}</div>
+          </div>
+        </div>
+        {USERS.map((user) => (
+          <div key={user.id} className="flex items-center gap-2">
+            <span
+              className={`flex w-16 shrink-0 items-center gap-1.5 text-xs font-medium ${
+                ACCENT_LABEL[user.accent satisfies Accent]
+              }`}
+            >
               <span
-                className={`flex w-16 items-center gap-1.5 text-xs font-medium ${
-                  ACCENT_LABEL[user.accent satisfies Accent]
+                className={`inline-block h-2 w-2 rounded-full ${
+                  ACCENT_DOT[user.accent satisfies Accent] ?? FALLBACK_DOT
                 }`}
-              >
-                <span
-                  className={`inline-block h-2 w-2 rounded-full ${
-                    ACCENT_DOT[user.accent satisfies Accent] ?? FALLBACK_DOT
-                  }`}
-                />
-                {user.name}
-              </span>
-              <ResultCell
-                value={value}
-                accent={user.accent}
-                onSave={(v) => onSetResult(user.id, dateISO, v)}
-                formatValue={formatValue}
-                parseInput={parseInput}
-                inputPlaceholder={inputPlaceholder}
-                variant="compact"
-                ariaLabel={`${exerciseLabel} result for ${user.name} on ${dateISO}`}
-                disabled={isPast}
               />
+              {user.name}
+            </span>
+            <div className="grid flex-1 grid-cols-2 gap-1.5">
+              {(['plank', 'pushups'] as const).map((exercise) => {
+                const value = getResult(progress, user.id, dateISO, exercise);
+                const formatValue = exercise === 'plank' ? formatPlank : formatPushups;
+                const parseInput = exercise === 'plank' ? parsePlank : parsePushups;
+                return (
+                  <ResultCell
+                    key={exercise}
+                    value={value}
+                    accent={user.accent}
+                    onSave={(v) => onSetResult(user.id, dateISO, exercise, v)}
+                    formatValue={formatValue}
+                    parseInput={parseInput}
+                    displayPlaceholder={EXERCISE_LABELS[exercise]}
+                    inputPlaceholder={EXERCISE_PLACEHOLDERS[exercise]}
+                    variant="compact"
+                    ariaLabel={`${EXERCISE_LABELS[exercise]} result for ${user.name} on ${dateISO}`}
+                    disabled={isPast}
+                  />
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -206,11 +249,11 @@ const DayCard = forwardRef<HTMLDivElement, RowProps>(function DayCard(
 function MonthHeaderRow({ progress }: { progress: YearProgress }) {
   const { group, collapsed, setCollapsed } = useMonthSection();
   const entryCount = monthEntryCount(progress, group.dates);
-  const totalSlots = group.dates.length * USERS.length;
+  const totalSlots = group.dates.length * USERS.length * 2;
 
   return (
     <tr className="border-y border-stone-300 bg-stone-100/80 dark:border-stone-600 dark:bg-stone-800/60">
-      <td colSpan={USERS.length + 1} className="p-0">
+      <td colSpan={USERS.length * 2 + 1} className="p-0">
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
@@ -247,7 +290,7 @@ function MonthHeaderRow({ progress }: { progress: YearProgress }) {
 function MonthHeaderCard({ progress }: { progress: YearProgress }) {
   const { group, collapsed, setCollapsed } = useMonthSection();
   const entryCount = monthEntryCount(progress, group.dates);
-  const totalSlots = group.dates.length * USERS.length;
+  const totalSlots = group.dates.length * USERS.length * 2;
 
   return (
     <button
@@ -283,10 +326,10 @@ function MonthHeaderCard({ progress }: { progress: YearProgress }) {
 export function ProgressTable({
   progress,
   onSetResult,
-  formatValue,
-  parseInput,
-  inputPlaceholder,
-  exerciseLabel,
+  formatPlank,
+  formatPushups,
+  parsePlank,
+  parsePushups,
 }: ProgressTableProps) {
   const months = groupDatesByMonth(progress.year);
   const today = todayISO();
@@ -383,10 +426,10 @@ export function ProgressTable({
           isPast={isPast}
           progress={progress}
           onSetResult={onSetResult}
-          formatValue={formatValue}
-          parseInput={parseInput}
-          inputPlaceholder={inputPlaceholder}
-          exerciseLabel={exerciseLabel}
+          formatPlank={formatPlank}
+          formatPushups={formatPushups}
+          parsePlank={parsePlank}
+          parsePushups={parsePushups}
         />
       );
     });
@@ -406,10 +449,10 @@ export function ProgressTable({
           isPast={isPast}
           progress={progress}
           onSetResult={onSetResult}
-          formatValue={formatValue}
-          parseInput={parseInput}
-          inputPlaceholder={inputPlaceholder}
-          exerciseLabel={exerciseLabel}
+          formatPlank={formatPlank}
+          formatPushups={formatPushups}
+          parsePlank={parsePlank}
+          parsePushups={parsePushups}
         />
       );
     });
@@ -419,7 +462,7 @@ export function ProgressTable({
       {/* Desktop / tablet: classic table. */}
       <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-stone-300/80 md:block dark:bg-stone-950 dark:ring-stone-600/80">
         <div ref={scrollContainerRef} className="max-h-[70vh] overflow-auto">
-          <table className="w-full min-w-[480px] border-collapse text-sm">
+          <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead className="sticky top-0 z-20 bg-stone-50/95 backdrop-blur dark:bg-stone-900/95">
               <tr className="border-b border-stone-300 dark:border-stone-600">
                 <th
@@ -431,8 +474,9 @@ export function ProgressTable({
                 {USERS.map((user) => (
                   <th
                     key={user.id}
-                    scope="col"
-                    className="border-l border-stone-300 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-stone-700 dark:border-stone-600 dark:text-stone-200"
+                    scope="colgroup"
+                    colSpan={2}
+                    className="border-l border-stone-300 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-stone-700 dark:border-stone-600 dark:text-stone-200"
                   >
                     <div className="flex items-center justify-center gap-2">
                       <span
@@ -444,6 +488,24 @@ export function ProgressTable({
                     </div>
                   </th>
                 ))}
+              </tr>
+              <tr className="border-b border-stone-300 bg-stone-50/95 dark:border-stone-600 dark:bg-stone-900/95">
+                <th
+                  scope="col"
+                  className="sticky left-0 z-30 bg-stone-50/95 px-3 py-2 dark:bg-stone-900/95"
+                  aria-hidden="true"
+                />
+                {USERS.flatMap((user) =>
+                  (['plank', 'pushups'] as const).map((exercise) => (
+                    <th
+                      key={`${user.id}-${exercise}`}
+                      scope="col"
+                      className="border-l border-stone-300 px-2 py-2 text-center text-[11px] font-medium uppercase tracking-wider text-stone-500 dark:border-stone-600 dark:text-stone-400"
+                    >
+                      {EXERCISE_LABELS[exercise]}
+                    </th>
+                  )),
+                )}
               </tr>
             </thead>
             <tbody>

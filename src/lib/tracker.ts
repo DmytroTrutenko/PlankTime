@@ -2,7 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { USERS } from '../config/users';
 import { supabase } from './supabase';
-import type { Database } from '../types/database';
 import type { UserId } from '../types/progress';
 
 export type TrackerTable = 'plank_results' | 'pushups';
@@ -35,6 +34,38 @@ export function setActiveUserHeader(userId: UserId): void {
   postgrestHeaders().set('x-active-user', userId);
 }
 
+// Writes one day's measurement for one user. Pass `value = null` to delete
+// the row, otherwise upsert a (user_id, date) pair with the given value.
+// Keeping both branches in one function lets callers stay one-liner short.
+export async function setResultForExercise<V extends string>(
+  config: TrackerConfig<V>,
+  userId: UserId,
+  dateISO: string,
+  value: number | null,
+): Promise<void> {
+  setActiveUserHeader(userId);
+
+  if (value == null) {
+    const { error } = await supabase
+      .from(config.table)
+      .delete()
+      .eq('user_id', userId)
+      .eq('date', dateISO);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase.from(config.table).upsert(
+    {
+      user_id: userId,
+      date: dateISO,
+      [config.valueField]: value,
+    } as never,
+    { onConflict: 'user_id,date' },
+  );
+  if (error) throw error;
+}
+
 export async function loadYearRows<V extends string>(
   config: TrackerConfig<V>,
   year: number,
@@ -56,43 +87,9 @@ export async function loadYearRows<V extends string>(
   return (data ?? []) as unknown as Row<V>[];
 }
 
-export async function upsertResult<V extends string>(
-  config: TrackerConfig<V>,
-  userId: UserId,
-  dateISO: string,
-  value: number,
-): Promise<void> {
-  setActiveUserHeader(userId);
-  const { error } = await supabase.from(config.table).upsert(
-    {
-      user_id: userId,
-      date: dateISO,
-      [config.valueField]: value,
-    } as never,
-    { onConflict: 'user_id,date' },
-  );
-  if (error) throw error;
-}
-
-export async function deleteResult<V extends string>(
-  config: TrackerConfig<V>,
-  userId: UserId,
-  dateISO: string,
-): Promise<void> {
-  setActiveUserHeader(userId);
-  const { error } = await supabase
-    .from(config.table)
-    .delete()
-    .eq('user_id', userId)
-    .eq('date', dateISO);
-  if (error) throw error;
-}
-
 // Whether the given string is one of the two hard-coded user ids. Used to
 // narrow `user_id` rows coming back from Postgres before indexing into
 // `entries` (which is keyed by `UserId`, not `string`).
 export function isKnownUserId(value: string): value is UserId {
   return USERS.some((u) => u.id === value);
 }
-
-export type { Database };
