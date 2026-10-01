@@ -1,0 +1,9 @@
+node_modules
+dist
+*.tsbuildinfo
+package-lock.json
+public/images
+.github
+.idea
+.DS_Store
+.ai

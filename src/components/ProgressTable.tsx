@@ -1,295 +1,59 @@
-import { createContext, forwardRef, useContext, useEffect, useRef, useState } from 'react';
-import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
+import { forwardRef, useEffect, useRef } from 'react';
 
 import { USERS } from '../config/users';
 import {
   formatDateDisplay,
   formatDateISO,
-  formatSeconds,
   formatWeekday,
   groupDatesByMonth,
-  parseTimeInput,
   todayISO,
-  type MonthGroup,
 } from '../lib/date';
+import { ACCENT_DOT, ACCENT_LABEL, FALLBACK_DOT, type Accent } from '../lib/accent';
 import { getResult, monthEntryCount } from '../lib/progress';
+import { ResultCell } from './ResultCell';
+import { ChevronDown, MonthBody, MonthSection, useMonthSection } from './MonthSection';
 import type { UserId, YearProgress } from '../types/progress';
 
 interface ProgressTableProps {
   progress: YearProgress;
-  onSetResult: (userId: UserId, dateISO: string, seconds: number | null) => void;
-}
-
-// Single source of truth for cell typography + padding — applied to the SAME
-// outer <div> for both display and edit states so swapping between them
-// cannot change the visual size of the cell content. Using a <div> instead of
-// <button> eliminates UA button defaults entirely (Tailwind preflight is off
-// here, so border / background would otherwise leak through). Colour is set
-// on the wrapper (not on the inner <input>), because with preflight off some
-// browsers apply a UA <input> colour that wins the cascade over Tailwind
-// utility classes and renders the digits white-on-white in light mode.
-const CELL_BOX =
-  'flex h-full w-full items-center justify-center border-0 bg-transparent px-3 py-2 ' +
-  'font-mono text-sm tabular-nums leading-5 transition-colors duration-150 ' +
-  'appearance-none select-none';
-
-const ACCENT_BG_HOVER: Record<string, string> = {
-  sky: 'hover:bg-sky-50 focus-within:bg-sky-50 dark:hover:bg-sky-950/40 dark:focus-within:bg-sky-950/50',
-  rose: 'hover:bg-rose-50 focus-within:bg-rose-50 dark:hover:bg-rose-950/40 dark:focus-within:bg-rose-950/50',
-};
-
-const ACCENT_DOT: Record<string, string> = {
-  sky: 'bg-sky-500',
-  rose: 'bg-rose-500',
-};
-
-const ACCENT_LABEL: Record<string, string> = {
-  sky: 'text-sky-700 dark:text-sky-300',
-  rose: 'text-rose-700 dark:text-rose-300',
-};
-
-interface CellProps {
-  value: number | null;
-  accent: string;
-  onSave: (seconds: number | null) => void;
-}
-
-// Always render an <input>. In display mode it is `readOnly`, in edit mode
-// it becomes editable. Because the element type never changes between states,
-// the cell cannot shift on focus — there is no span → input swap. The
-// `caret-color: transparent` keeps the text caret hidden while readOnly so
-// the field visually looks like plain text, not an input.
-function ResultCell({ value, accent, onSave }: CellProps) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editing]);
-
-  const startEdit = () => {
-    if (editing) return;
-    setDraft(value != null ? formatSeconds(value) : '');
-    setEditing(true);
-  };
-
-  const commit = () => {
-    onSave(parseTimeInput(draft));
-    setEditing(false);
-  };
-
-  const cancel = () => {
-    setDraft('');
-    setEditing(false);
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      commit();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      cancel();
-    }
-  };
-
-  const isEmpty = value == null;
-  const valueText = formatSeconds(value);
-
-  return (
-    <div
-      className={`${CELL_BOX} ${ACCENT_BG_HOVER[accent] ?? ''} ${
-        isEmpty
-          ? 'font-normal text-stone-400 dark:text-stone-500'
-          : 'font-semibold text-stone-800 dark:text-stone-100'
-      }`}
-    >
-      <input
-        ref={inputRef}
-        type="text"
-        value={editing ? draft : valueText}
-        onFocus={startEdit}
-        onChange={(e) => {
-          // The mobile decimal keypad (inputMode="decimal") only exposes
-          // the locale's decimal separator — `.` in en-US, `,` in de-DE —
-          // and has no `:` key. Normalise to `:` so the user always sees
-          // the canonical m:ss separator while editing.
-          setDraft(e.target.value.replace(/[.,]/g, ':'));
-        }}
-        onBlur={commit}
-        onKeyDown={handleKeyDown}
-        placeholder={editing ? 'min or m:ss' : '—'}
-        inputMode="decimal"
-        autoComplete="off"
-        enterKeyHint="done"
-        // No `readOnly` — iOS Safari / Android Chrome will NOT show the
-        // virtual keyboard for a readOnly input, even if we toggle it off
-        // synchronously in `startEdit`: the focus event has already fired by
-        // the time React re-renders with the new state, and `.focus()` on an
-        // already-focused node does not re-trigger the keyboard. Keeping the
-        // input always editable makes tap → focus → keyboard happen in a
-        // single gesture on mobile. Visual "not an input" look in display
-        // mode is preserved via the wrapper's styles + `caret-color:
-        // transparent` on the input itself.
-        // `touch-action: manipulation` removes the 300 ms tap delay and
-        // stops double-tap zoom on mobile so the cell never grows on tap.
-        // Colour is intentionally NOT set here — it comes from the wrapper
-        // above via `color: inherit` in INPUT_RESET_STYLE so UA <input>
-        // styles can't override it.
-        className={
-          'block w-full min-w-0 touch-manipulation appearance-none border-0 bg-transparent text-center ' +
-          'outline-none focus:outline-none focus:ring-0 ' +
-          'cursor-pointer ' +
-          (isEmpty ? 'font-normal' : 'font-semibold')
-        }
-        style={editing ? INPUT_RESET_STYLE : INPUT_READONLY_STYLE}
-      />
-    </div>
-  );
-}
-
-// Hard reset on the input — guarantees no UA default outline / border /
-// shadow / padding / background leaks in and shifts the layout on focus.
-// `font-size: 16px` is the minimum iOS Safari / Android Chrome accept
-// without auto-zooming the viewport when the input is focused. We render
-// the input always (never readOnly), so any smaller font would cause the
-// page to zoom in on tap and stay zoomed after blur — `font-size` must
-// be ≥ 16 px on the element that receives focus, not just on a wrapper.
-// `line-height: 20px` matches Tailwind's `leading-5` so the row geometry
-// is identical to a plain text-sm cell even though the digits render
-// slightly larger. `color: 'inherit'` is defensive: with Tailwind's
-// preflight disabled here, some browsers apply their own (sometimes
-// white-on-white) UA colour to <input> that can override utility classes
-// in the cascade.
-const INPUT_RESET_STYLE: CSSProperties = {
-  fontSize: '16px',
-  lineHeight: '20px',
-  padding: '0',
-  margin: '0',
-  border: 'none',
-  outline: 'none',
-  boxShadow: 'none',
-  background: 'transparent',
-  color: 'inherit',
-  WebkitAppearance: 'none',
-  appearance: 'none',
-};
-
-// Same reset, but with the caret hidden so the input visually looks like
-// plain text instead of an input that can blink / receive focus rings.
-const INPUT_READONLY_STYLE: CSSProperties = {
-  ...INPUT_RESET_STYLE,
-  caretColor: 'transparent',
-};
-
-// Compact button that doubles as a display + tap-to-edit field for the mobile cards.
-// Same always-render-input pattern as the desktop cell: a single <input> is
-// always rendered and always editable — swapping between display and edit
-// states only swaps the wrapper's background and the input's caret, so the
-// element type never changes between states — no width / height jump on focus.
-// Keeping the input always editable is required for the mobile virtual
-// keyboard to actually appear on tap (iOS Safari will not show the keyboard
-// for readOnly inputs).
-function CompactResultCell({
-  value,
-  onSave,
-}: {
-  value: number | null;
-  onSave: (seconds: number | null) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editing]);
-
-  const startEdit = () => {
-    if (editing) return;
-    setDraft(value != null ? formatSeconds(value) : '');
-    setEditing(true);
-  };
-
-  const commit = () => {
-    onSave(parseTimeInput(draft));
-    setEditing(false);
-  };
-
-  const cancel = () => {
-    setDraft('');
-    setEditing(false);
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      commit();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      cancel();
-    }
-  };
-
-  const isEmpty = value == null;
-
-  return (
-    <div
-      className={`flex h-9 w-full items-center justify-center rounded-lg transition-colors appearance-none ${
-        editing
-          ? 'bg-stone-100 px-2 text-stone-800 dark:bg-stone-800 dark:text-stone-100'
-          : isEmpty
-            ? 'bg-stone-100 text-stone-400 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-500 dark:hover:bg-stone-700'
-            : 'bg-white text-stone-800 ring-1 ring-stone-300/80 hover:bg-stone-50 dark:bg-stone-800 dark:text-stone-100 dark:ring-stone-600/80 dark:hover:bg-stone-700'
-      }`}
-    >
-      <input
-        ref={inputRef}
-        type="text"
-        value={editing ? draft : formatSeconds(value)}
-        onFocus={startEdit}
-        onChange={(e) => {
-          // Mobile decimal keypad exposes `.` / `,` instead of `:` — see
-          // the matching comment on the desktop cell.
-          setDraft(e.target.value.replace(/[.,]/g, ':'));
-        }}
-        onBlur={commit}
-        onKeyDown={handleKeyDown}
-        placeholder={editing ? 'min or m:ss' : '—'}
-        inputMode="decimal"
-        autoComplete="off"
-        enterKeyHint="done"
-        // No `readOnly` — same iOS Safari / Android Chrome issue as the
-        // desktop cell: virtual keyboards never appear for readOnly inputs,
-        // even if we toggle it off in the same tap. Keeping the input
-        // always editable makes tap → focus → keyboard a single gesture.
-        // Colour is intentionally NOT set here — it comes from the wrapper
-        // above via `color: inherit` in INPUT_RESET_STYLE so UA <input>
-        // styles can't override it.
-        className="block w-full min-w-0 touch-manipulation appearance-none border-0 bg-transparent text-center outline-none focus:outline-none focus:ring-0 font-mono text-sm leading-5 font-semibold tabular-nums"
-        style={editing ? INPUT_RESET_STYLE : INPUT_READONLY_STYLE}
-      />
-    </div>
-  );
+  onSetResult: (userId: UserId, dateISO: string, value: number | null) => void;
+  // Display / input formatters. The plank tracker passes time formatters
+  // (`5`, `1:25`, `0:30`); the push-ups tracker passes integer ones. The
+  // cell uses these for both display and edit-draft conversion so swapping
+  // trackers is just two prop changes.
+  formatValue: (value: number | null) => string;
+  parseInput: (input: string) => number | null;
+  inputPlaceholder: string;
+  // Exercise name used in aria-labels (e.g. "plank", "push-ups").
+  exerciseLabel: string;
 }
 
 interface RowProps {
   date: Date;
   dateISO: string;
   isToday: boolean;
+  isPast: boolean;
   progress: YearProgress;
-  onSetResult: (userId: UserId, dateISO: string, seconds: number | null) => void;
+  onSetResult: (userId: UserId, dateISO: string, value: number | null) => void;
+  formatValue: (value: number | null) => string;
+  parseInput: (input: string) => number | null;
+  inputPlaceholder: string;
+  exerciseLabel: string;
 }
 
 const ProgressRow = forwardRef<HTMLTableRowElement, RowProps>(function ProgressRow(
-  { date, dateISO, isToday, progress, onSetResult },
+  {
+    date,
+    dateISO,
+    isToday,
+    isPast,
+    progress,
+    onSetResult,
+    formatValue,
+    parseInput,
+    inputPlaceholder,
+    exerciseLabel,
+  },
   ref,
 ) {
   return (
@@ -335,7 +99,13 @@ const ProgressRow = forwardRef<HTMLTableRowElement, RowProps>(function ProgressR
             <ResultCell
               value={value}
               accent={user.accent}
-              onSave={(seconds) => onSetResult(user.id, dateISO, seconds)}
+              onSave={(v) => onSetResult(user.id, dateISO, v)}
+              formatValue={formatValue}
+              parseInput={parseInput}
+              inputPlaceholder={inputPlaceholder}
+              variant="desktop"
+              ariaLabel={`${exerciseLabel} result for ${user.name} on ${dateISO}`}
+              disabled={isPast}
             />
           </td>
         );
@@ -347,7 +117,18 @@ const ProgressRow = forwardRef<HTMLTableRowElement, RowProps>(function ProgressR
 // One card per day for the mobile (<md) layout — shows the date, weekday,
 // and one button per user stacked vertically.
 const DayCard = forwardRef<HTMLDivElement, RowProps>(function DayCard(
-  { date, dateISO, isToday, progress, onSetResult },
+  {
+    date,
+    dateISO,
+    isToday,
+    isPast,
+    progress,
+    onSetResult,
+    formatValue,
+    parseInput,
+    inputPlaceholder,
+    exerciseLabel,
+  },
   ref,
 ) {
   return (
@@ -389,16 +170,27 @@ const DayCard = forwardRef<HTMLDivElement, RowProps>(function DayCard(
           return (
             <div key={user.id} className="flex items-center gap-2">
               <span
-                className={`flex w-16 items-center gap-1.5 text-xs font-medium ${ACCENT_LABEL[user.accent] ?? ''}`}
+                className={`flex w-16 items-center gap-1.5 text-xs font-medium ${
+                  ACCENT_LABEL[user.accent satisfies Accent]
+                }`}
               >
                 <span
-                  className={`inline-block h-2 w-2 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-stone-400'}`}
+                  className={`inline-block h-2 w-2 rounded-full ${
+                    ACCENT_DOT[user.accent satisfies Accent] ?? FALLBACK_DOT
+                  }`}
                 />
                 {user.name}
               </span>
-              <CompactResultCell
+              <ResultCell
                 value={value}
-                onSave={(seconds) => onSetResult(user.id, dateISO, seconds)}
+                accent={user.accent}
+                onSave={(v) => onSetResult(user.id, dateISO, v)}
+                formatValue={formatValue}
+                parseInput={parseInput}
+                inputPlaceholder={inputPlaceholder}
+                variant="compact"
+                ariaLabel={`${exerciseLabel} result for ${user.name} on ${dateISO}`}
+                disabled={isPast}
               />
             </div>
           );
@@ -408,73 +200,13 @@ const DayCard = forwardRef<HTMLDivElement, RowProps>(function DayCard(
   );
 });
 
-// Chevron SVG used by the month accordion. Rotated by CSS rather than swapping
-// the path so the icon geometry stays stable across toggles.
-function ChevronDown({ className = '' }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="14"
-      height="14"
-      viewBox="0 0 20 20"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M5 7.5L10 12.5L15 7.5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-interface MonthSectionContextValue {
-  collapsed: boolean;
-  setCollapsed: (v: boolean) => void;
-  group: MonthGroup;
-}
-
-const MonthSectionContext = createContext<MonthSectionContextValue | null>(null);
-
-function useMonthSection(): MonthSectionContextValue {
-  const ctx = useContext(MonthSectionContext);
-  if (!ctx) throw new Error('useMonthSection must be used inside MonthSection');
-  return ctx;
-}
-
-interface MonthSectionProps {
-  group: MonthGroup;
-  defaultCollapsed: boolean;
-  children: ReactNode;
-}
-
-// Shared month-section wrapper that tracks collapsed state and renders a
-// single children block. Each instance owns its own collapsed state so
-// toggling one month doesn't affect any other.
-function MonthSection({ group, defaultCollapsed, children }: MonthSectionProps) {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
-  return (
-    <MonthSectionContext.Provider value={{ collapsed, setCollapsed, group }}>
-      {children}
-    </MonthSectionContext.Provider>
-  );
-}
-
 // Month header row for the desktop table layout. Spans every column so the
 // click target covers the full row width and the row looks like a single
 // section divider instead of a left-aligned label.
-function MonthHeaderRow({
-  progress,
-}: {
-  progress: YearProgress;
-}) {
+function MonthHeaderRow({ progress }: { progress: YearProgress }) {
   const { group, collapsed, setCollapsed } = useMonthSection();
   const entryCount = monthEntryCount(progress, group.dates);
   const totalSlots = group.dates.length * USERS.length;
-  const monthLabel = group.fullLabel;
 
   return (
     <tr className="border-y border-stone-300 bg-stone-100/80 dark:border-stone-600 dark:bg-stone-800/60">
@@ -488,7 +220,7 @@ function MonthHeaderRow({
         >
           <span className="flex items-baseline gap-3">
             <span className="text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-200">
-              {monthLabel}
+              {group.fullLabel}
             </span>
             {group.isCurrent && (
               <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-900 dark:bg-amber-800 dark:text-amber-100">
@@ -512,11 +244,7 @@ function MonthHeaderRow({
 
 // Month header divider for the mobile card layout. Full-width click target
 // sitting between card groups.
-function MonthHeaderCard({
-  progress,
-}: {
-  progress: YearProgress;
-}) {
+function MonthHeaderCard({ progress }: { progress: YearProgress }) {
   const { group, collapsed, setCollapsed } = useMonthSection();
   const entryCount = monthEntryCount(progress, group.dates);
   const totalSlots = group.dates.length * USERS.length;
@@ -552,16 +280,14 @@ function MonthHeaderCard({
   );
 }
 
-// Wraps the children of a month section so it can be conditionally rendered
-// (i.e. unmounted entirely when collapsed) without breaking surrounding
-// table-row layout. Renders an empty fragment when collapsed.
-function MonthBody({ children }: { children: ReactNode }) {
-  const { collapsed } = useMonthSection();
-  if (collapsed) return null;
-  return <>{children}</>;
-}
-
-export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
+export function ProgressTable({
+  progress,
+  onSetResult,
+  formatValue,
+  parseInput,
+  inputPlaceholder,
+  exerciseLabel,
+}: ProgressTableProps) {
   const months = groupDatesByMonth(progress.year);
   const today = todayISO();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -574,10 +300,10 @@ export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
   //     we adjust container.scrollTop to centre the row vertically.
   //   - Mobile (< md): cards are stacked in the page itself, so we scroll
   //     document.scrollingElement explicitly.
-  // On mobile the address bar collapses after first paint, which reflows the
-  // viewport and resets scroll to top — so we re-assert the scroll a few
-  // times across the first ~1.5s. Each attempt overrides the previous one,
-  // so a stale scroll from an earlier tick is replaced by a fresh one.
+  // On mobile the address bar collapses after first paint, which reflows
+  // the viewport and resets scroll to top — so we re-assert the scroll a
+  // few times across the first ~1.5s. Each attempt overrides the previous
+  // one, so a stale scroll from an earlier tick is replaced by a fresh one.
   useEffect(() => {
     if ('scrollRestoration' in history) {
       history.scrollRestoration = 'manual';
@@ -637,12 +363,16 @@ export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
     };
   }, []);
 
-  // Render the rows / cards for a single month. Used by both desktop table and
-  // mobile card layouts — each calls this with its own per-row renderer.
-  const renderMonthRows = (month: MonthGroup) =>
+  // Render the rows / cards for a single month. Used by both desktop table
+  // and mobile card layouts — each calls this with its own per-row renderer.
+  const renderMonthRows = (month: (typeof months)[number]) =>
     month.dates.map((date) => {
       const dateISO = formatDateISO(date);
       const isToday = dateISO === today;
+      // ISO YYYY-MM-DD strings compare lexically the same as chronologically,
+      // so a straight string compare is enough — no need to construct Dates
+      // just to compare them.
+      const isPast = dateISO < today;
       return (
         <ProgressRow
           key={dateISO}
@@ -650,25 +380,36 @@ export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
           date={date}
           dateISO={dateISO}
           isToday={isToday}
+          isPast={isPast}
           progress={progress}
           onSetResult={onSetResult}
+          formatValue={formatValue}
+          parseInput={parseInput}
+          inputPlaceholder={inputPlaceholder}
+          exerciseLabel={exerciseLabel}
         />
       );
     });
 
-  const renderMonthCards = (month: MonthGroup) =>
+  const renderMonthCards = (month: (typeof months)[number]) =>
     month.dates.map((date) => {
       const dateISO = formatDateISO(date);
       const isToday = dateISO === today;
+      const isPast = dateISO < today;
       return (
         <DayCard
           key={dateISO}
-          ref={dateISO === today ? todayCardRef : undefined}
+          ref={isToday ? todayCardRef : undefined}
           date={date}
           dateISO={dateISO}
           isToday={isToday}
+          isPast={isPast}
           progress={progress}
           onSetResult={onSetResult}
+          formatValue={formatValue}
+          parseInput={parseInput}
+          inputPlaceholder={inputPlaceholder}
+          exerciseLabel={exerciseLabel}
         />
       );
     });
@@ -681,17 +422,23 @@ export function ProgressTable({ progress, onSetResult }: ProgressTableProps) {
           <table className="w-full min-w-[480px] border-collapse text-sm">
             <thead className="sticky top-0 z-20 bg-stone-50/95 backdrop-blur dark:bg-stone-900/95">
               <tr className="border-b border-stone-300 dark:border-stone-600">
-                <th className="sticky left-0 z-30 bg-stone-50/95 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500 dark:bg-stone-900/95 dark:text-stone-400">
+                <th
+                  scope="col"
+                  className="sticky left-0 z-30 bg-stone-50/95 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500 dark:bg-stone-900/95 dark:text-stone-400"
+                >
                   Date
                 </th>
                 {USERS.map((user) => (
                   <th
                     key={user.id}
+                    scope="col"
                     className="border-l border-stone-300 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-stone-700 dark:border-stone-600 dark:text-stone-200"
                   >
                     <div className="flex items-center justify-center gap-2">
                       <span
-                        className={`inline-block h-2 w-2 rounded-full ${ACCENT_DOT[user.accent] ?? 'bg-stone-400'}`}
+                        className={`inline-block h-2 w-2 rounded-full ${
+                          ACCENT_DOT[user.accent] ?? FALLBACK_DOT
+                        }`}
                       />
                       {user.name}
                     </div>

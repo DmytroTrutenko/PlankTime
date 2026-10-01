@@ -60,8 +60,7 @@ export function groupDatesByMonth(year: number, today: Date = new Date()): Month
         dates: [],
         isCompleted: monthEnd.getTime() < todayMidnight.getTime(),
         isCurrent:
-          date.getFullYear() === todayMidnight.getFullYear() &&
-          month === todayMidnight.getMonth(),
+          date.getFullYear() === todayMidnight.getFullYear() && month === todayMidnight.getMonth(),
       });
     }
     // Push into the LAST group (just-created on a month boundary, or the
@@ -124,6 +123,14 @@ export function formatSeconds(totalSeconds: number | null | undefined): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+// Plain integer formatter for rep-counting exercises (push-ups etc).
+// Mirrors the `formatSeconds` shape so SummaryBar + ProgressTable can swap
+// one formatter prop and stay identical in layout.
+export function formatReps(value: number | null | undefined): string {
+  if (value == null || value <= 0) return '—';
+  return String(value);
+}
+
 // Accept `:`, `.`, and `,` as the m:ss separator so the mobile numeric /
 // decimal keypad (`inputMode="decimal"` on iOS Safari and Android Chrome
 // only exposes the locale's decimal separator — typically `.` or `,` —
@@ -148,4 +155,17 @@ export function parseTimeInput(input: string): number | null {
     return parts[0]! * 60 + parts[1]!;
   }
   return parts[0]! * 3600 + parts[1]! * 60 + parts[2]!;
+}
+
+// Integer parser for rep-counting exercises. Accepts any non-negative
+// whole number; everything else (decimals, separators, junk) returns null
+// so the input is left empty rather than silently corrupted.
+const REPS_INPUT_PATTERN = /^\d{1,5}$/;
+
+export function parseRepsInput(input: string): number | null {
+  const trimmed = input.trim();
+  if (trimmed === '') return null;
+  if (!REPS_INPUT_PATTERN.test(trimmed)) return null;
+  const value = Number.parseInt(trimmed, 10);
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
