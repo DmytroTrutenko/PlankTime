@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { USERS } from '../config/users';
 import { todayISO } from '../lib/date';
+import { combinedStreak } from '../lib/progress';
 import {
   ACCENT_DOT,
   ACCENT_RING,
@@ -56,34 +57,10 @@ function computeStats(
   return { count: values.length, best, average: Math.round(sum / values.length) };
 }
 
-// Streak badge uses a single (combined) streak — the longest run of days
-// where the user logged either exercise. Counting per-exercise would give
-// two independent streaks, which adds height without adding motivation
+// Streak badge uses the combined streak from `lib/progress` — the longest run
+// of days where the user logged either exercise. Counting per-exercise would
+// give two independent streaks, which adds height without adding motivation
 // ("did I plank today?" is the question the bar answers).
-function dailyStreak(progress: YearProgress, userId: UserId, todayISO: string): number {
-  const entries = progress.entries[userId];
-  const today = new Date(`${todayISO}T00:00:00`);
-  let streak = 0;
-  const cursor = new Date(today);
-
-  const hasEntry = (d: Date) => {
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const slot = entries[iso];
-    return slot != null && (slot.plank != null || slot.pushups != null);
-  };
-
-  // Skip today if missing, but only once.
-  if (!hasEntry(cursor)) {
-    cursor.setDate(cursor.getDate() - 1);
-    if (!hasEntry(cursor)) return 0;
-  }
-
-  while (hasEntry(cursor)) {
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return streak;
-}
 
 // Single 3-column grid shared between the table header row and every metric
 // row so the "Plank / Push-ups" columns line up perfectly with their values
@@ -227,7 +204,7 @@ export function SummaryBar({ progress, formatPlank, formatPushups, userId }: Sum
       {users.map((user) => {
         const dotClass = ACCENT_DOT[user.accent] ?? FALLBACK_DOT;
         const ringClass = ACCENT_RING[user.accent] ?? FALLBACK_RING;
-        const streak = dailyStreak(progress, user.id, today);
+        const streak = combinedStreak(progress, user.id, today);
         const streakBg =
           streak > 0
             ? (ACCENT_STREAK_BG_ACTIVE[user.accent] ?? FALLBACK_STREAK_BG_ACTIVE)

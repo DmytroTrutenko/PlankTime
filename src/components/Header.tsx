@@ -1,8 +1,17 @@
 import type { ReactNode } from 'react';
 
 import { USERS } from '../config/users';
-import { ACCENT_DOT, ACCENT_RING, FALLBACK_DOT, FALLBACK_RING } from '../lib/accent';
-import type { UserId } from '../types/progress';
+import { todayISO } from '../lib/date';
+import {
+  ACCENT_DOT,
+  ACCENT_RING,
+  ACCENT_STREAK_BG_ACTIVE,
+  FALLBACK_DOT,
+  FALLBACK_RING,
+  FALLBACK_STREAK_BG_ACTIVE,
+} from '../lib/accent';
+import { combinedStreak } from '../lib/progress';
+import type { UserId, YearProgress } from '../types/progress';
 
 interface HeaderProps {
   rightSlot?: ReactNode;
@@ -10,9 +19,14 @@ interface HeaderProps {
   // header — opens the SummaryModal for that user. Hidden on md+ where the
   // summary lives inline above the table.
   onOpenSummary?: (userId: UserId) => void;
+  // Needed to render the per-user streak pill next to each user name in the
+  // mobile header pills. Optional so the header is still usable (with just
+  // the user pills) before progress has loaded.
+  progress?: YearProgress;
 }
 
-export function Header({ rightSlot, onOpenSummary }: HeaderProps) {
+export function Header({ rightSlot, onOpenSummary, progress }: HeaderProps) {
+  const today = todayISO();
   return (
     <header className="sticky top-0 z-40 h-14 bg-canvas/85 backdrop-blur supports-[backdrop-filter]:bg-canvas/70 dark:bg-canvas-night/85 dark:supports-[backdrop-filter]:bg-canvas-night/70">
       <div className="mx-auto flex h-full max-w-3xl items-center justify-between gap-3 px-4 sm:px-6">
@@ -24,6 +38,11 @@ export function Header({ rightSlot, onOpenSummary }: HeaderProps) {
             {USERS.map((user) => {
               const dot = ACCENT_DOT[user.accent] ?? FALLBACK_DOT;
               const ring = ACCENT_RING[user.accent] ?? FALLBACK_RING;
+              const streak = progress ? combinedStreak(progress, user.id, today) : 0;
+              const streakActive = streak > 0;
+              const streakBg = streakActive
+                ? (ACCENT_STREAK_BG_ACTIVE[user.accent] ?? FALLBACK_STREAK_BG_ACTIVE)
+                : 'bg-stone-200 text-stone-500 dark:bg-stone-800 dark:text-stone-400';
               return (
                 <button
                   key={user.id}
@@ -36,7 +55,14 @@ export function Header({ rightSlot, onOpenSummary }: HeaderProps) {
                     aria-hidden="true"
                     className={`inline-block h-2 w-2 shrink-0 rounded-full ring-2 ring-white dark:ring-stone-950 ${dot}`}
                   />
-                  {user.name}
+                  <span className="truncate">{user.name}</span>
+                  <span
+                    className={`inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px text-[10px] font-semibold leading-none tabular-nums ${streakBg}`}
+                    title={streakActive ? `${streak} ${streak === 1 ? 'day' : 'days'} streak` : 'No active streak'}
+                  >
+                    <span aria-hidden="true">🔥</span>
+                    {streak}
+                  </span>
                 </button>
               );
             })}

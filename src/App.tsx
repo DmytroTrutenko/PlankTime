@@ -26,6 +26,7 @@ export default function App() {
       <Header
         rightSlot={<ThemeToggle />}
         onOpenSummary={setOpenSummaryUserId}
+        progress={tracker.progress}
       />
 
       <main className="relative">

@@ -37,6 +37,39 @@ export function monthEntryCount(progress: YearProgress, dates: Date[]): number {
 }
 
 // Longest run of consecutive days ending today (or yesterday — gives a one-day
+// grace so editing at 1am doesn't drop the streak to zero) where the user
+// logged EITHER exercise. Per-exercise streaks (currentStreak) would give
+// two independent counters, but the SummaryBar / header pills treat the day
+// as the unit of motivation: "did I work out today?" not "did I plank today
+// and separately did I push-up today?".
+export function combinedStreak(
+  progress: YearProgress,
+  userId: UserId,
+  todayISO: string,
+): number {
+  const entries = progress.entries[userId];
+  const today = new Date(`${todayISO}T00:00:00`);
+  let streak = 0;
+  const cursor = new Date(today);
+
+  const hasEntry = (d: Date) => {
+    const slot = entries[formatDateISO(d)];
+    return slot != null && (slot.plank != null || slot.pushups != null);
+  };
+
+  if (!hasEntry(cursor)) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!hasEntry(cursor)) return 0;
+  }
+
+  while (hasEntry(cursor)) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+// Longest run of consecutive days ending today (or yesterday — gives a one-day
 // grace so editing at 1am doesn't drop the streak to zero). A "logged" day
 // is one where the given exercise has any value — a user can plank but skip
 // push-ups and still have a plank streak.
