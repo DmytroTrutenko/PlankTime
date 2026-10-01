@@ -77,6 +77,12 @@ interface UserCardProps {
   pushupsStats: ExerciseStats;
   formatPlank: (value: number | null) => string;
   formatPushups: (value: number | null) => string;
+  // The accordion (collapse header / chevron / button toggle) only makes
+  // sense on desktop where two cards share the screen. In the mobile modal
+  // a single card already has the full width to itself, so the toggle is
+  // pure noise — set this to drop the button affordance and always show
+  // the stats table.
+  alwaysExpanded?: boolean;
 }
 
 function UserCard({
@@ -89,45 +95,55 @@ function UserCard({
   pushupsStats,
   formatPlank,
   formatPushups,
+  alwaysExpanded = false,
 }: UserCardProps) {
   const [expanded, setExpanded] = useState(true);
+  const isExpanded = alwaysExpanded || expanded;
   const streakActive = streak > 0;
   const contentId = `summary-${userName}`;
+
+  const headerInner = (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span
+        className={`inline-block h-3 w-3 shrink-0 rounded-full ring-2 ring-white dark:ring-stone-950 ${accentDot}`}
+      />
+      <h2 className="truncate text-base font-semibold tracking-tight text-stone-900 dark:text-stone-50">
+        {userName}
+      </h2>
+      <span
+        className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold leading-none tabular-nums transition-colors ${streakBg}`}
+        title={streakActive ? 'Consecutive days ending today' : 'No active streak'}
+      >
+        <span aria-hidden="true">🔥</span>
+        {streak} {streakActive ? (streak === 1 ? 'day' : 'days') : ''}
+      </span>
+    </div>
+  );
 
   return (
     <div
       className={`relative min-w-0 overflow-hidden rounded-2xl bg-white shadow-lift ring-1 transition-all duration-200 dark:bg-stone-950 dark:ring-stone-800 ${ringClass}`}
     >
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-        aria-controls={contentId}
-        className="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left transition-colors hover:bg-stone-50 dark:hover:bg-stone-900/60"
-      >
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span
-            className={`inline-block h-3 w-3 shrink-0 rounded-full ring-2 ring-white dark:ring-stone-950 ${accentDot}`}
+      {alwaysExpanded ? (
+        <div className="flex w-full items-center gap-3 px-5 py-3.5">{headerInner}</div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-controls={contentId}
+          className="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left transition-colors hover:bg-stone-50 dark:hover:bg-stone-900/60"
+        >
+          {headerInner}
+          <Chevron
+            className={`shrink-0 text-stone-400 transition-transform duration-200 dark:text-stone-500 ${
+              expanded ? 'rotate-180' : ''
+            }`}
           />
-          <h2 className="truncate text-base font-semibold tracking-tight text-stone-900 dark:text-stone-50">
-            {userName}
-          </h2>
-          <span
-            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold leading-none tabular-nums transition-colors ${streakBg}`}
-            title={streakActive ? 'Consecutive days ending today' : 'No active streak'}
-          >
-            <span aria-hidden="true">🔥</span>
-            {streak} {streakActive ? (streak === 1 ? 'day' : 'days') : ''}
-          </span>
-        </div>
-        <Chevron
-          className={`shrink-0 text-stone-400 transition-transform duration-200 dark:text-stone-500 ${
-            expanded ? 'rotate-180' : ''
-          }`}
-        />
-      </button>
+        </button>
+      )}
 
-      {expanded && (
+      {isExpanded && (
         <div
           id={contentId}
           className="border-t border-stone-200 px-4 pb-4 pt-3 dark:border-stone-800"
@@ -221,6 +237,7 @@ export function SummaryBar({ progress, formatPlank, formatPushups, userId }: Sum
             pushupsStats={computeStats(progress, user.id, 'pushups')}
             formatPlank={formatPlank}
             formatPushups={formatPushups}
+            alwaysExpanded={userId != null}
           />
         );
       })}
