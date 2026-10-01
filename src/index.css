@@ -94,8 +94,13 @@ textarea:focus {
    colours look the same on a tall mobile portrait and a short desktop
    viewport — the previous wider gradient read as different brightness on
    each.
-   `image-set()` lets the browser pick WebP when supported and fall back
-   to JPEG elsewhere — covers Safari < 14 and older Android. */
+   Single JPEG, not `image-set()`: the WebP variant is generated locally by
+   `npm run optimize-assets` and gitignored (it's a build artefact, not a
+   source asset). Vite can't rewrite a URL whose target file isn't in the
+   build tree, so the WebP URL ended up at the wrong path on Pages while
+   the JPEG path was rewritten correctly. Safari 14+ (Sep 2020) supports
+   WebP natively, so the JPEG-only fallback isn't worth the build-system
+   complication. */
 .page-bg {
   position: fixed;
   inset: 0;
@@ -108,10 +113,7 @@ textarea:focus {
       rgb(10 9 8 / 0.45) 70%,
       rgb(10 9 8 / 0.5) 100%
     ),
-    image-set(
-      url('/images/hero.webp') type('image/webp'),
-      url('/images/hero.jpg') type('image/jpeg')
-    );
+    url('/images/hero.jpg');
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
