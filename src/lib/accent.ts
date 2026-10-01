@@ -33,8 +33,8 @@ export const ACCENT_STREAK_BG: Record<Accent, string> = {
 };
 
 export const ACCENT_STREAK_BG_ACTIVE: Record<Accent, string> = {
-  sky: 'bg-sky-500 text-white shadow-[0_0_0_3px_rgb(14,165,233,0.18)] dark:bg-sky-500 dark:shadow-[0_0_0_3px_rgb(14,165,233,0.28)]',
-  rose: 'bg-rose-500 text-white shadow-[0_0_0_3px_rgb(244,63,94,0.18)] dark:bg-rose-500 dark:shadow-[0_0_0_3px_rgb(244,63,94,0.28)]',
+  sky: 'bg-sky-500 text-white dark:bg-sky-500 dark:text-white',
+  rose: 'bg-rose-500 text-white dark:bg-rose-500 dark:text-white',
 };
 
 // Safe fallbacks for accent strings outside the known set.

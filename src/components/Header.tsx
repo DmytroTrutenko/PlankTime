@@ -48,16 +48,23 @@ export function Header({ rightSlot, onOpenSummary, progress }: HeaderProps) {
                   key={user.id}
                   type="button"
                   onClick={() => onOpenSummary(user.id)}
-                  aria-label={`Open ${user.name} summary`}
-                  className={`inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-stone-800 shadow-soft ring-1 transition-colors hover:bg-stone-50 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-900 ${ring}`}
+                  aria-label={`Open ${user.name} summary, ${streak} ${streak === 1 ? 'day' : 'days'} streak`}
+                  // Two-tone pill: name on the left in the neutral card colour,
+                  // streak on the right in the user's accent. The seam between
+                  // the two halves is a hard colour break (parent's
+                  // rounded-full + overflow-hidden clips the inner spans to
+                  // the chip's rounded outline).
+                  className={`group inline-flex items-stretch overflow-hidden rounded-full bg-white text-sm font-semibold shadow-soft ring-1 transition-colors hover:bg-stone-50 dark:bg-stone-950 dark:hover:bg-stone-900 ${ring}`}
                 >
+                  <span className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 text-stone-800 dark:text-stone-100">
+                    <span
+                      aria-hidden="true"
+                      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white dark:ring-stone-950 ${dot}`}
+                    />
+                    {user.name}
+                  </span>
                   <span
-                    aria-hidden="true"
-                    className={`inline-block h-2 w-2 shrink-0 rounded-full ring-2 ring-white dark:ring-stone-950 ${dot}`}
-                  />
-                  <span className="truncate">{user.name}</span>
-                  <span
-                    className={`inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px text-[10px] font-semibold leading-none tabular-nums ${streakBg}`}
+                    className={`inline-flex shrink-0 items-center gap-1 px-2.5 py-1.5 text-sm font-semibold tabular-nums transition-colors ${streakBg}`}
                     title={streakActive ? `${streak} ${streak === 1 ? 'day' : 'days'} streak` : 'No active streak'}
                   >
                     <span aria-hidden="true">🔥</span>
