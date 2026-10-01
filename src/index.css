@@ -2,10 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Single source of truth for the brand palette. Tailwind config reads the
+   same hex values into its `ink` / `canvas` color tokens, so changing a
+   value here (and in tailwind.config.js) updates both surfaces. */
+:root {
+  --ink: #1c1917;
+  --ink-muted: #78716c;
+  --ink-soft: #a8a29e;
+  --ink-inverse: #fafaf9;
+  --canvas: #f5efe0;
+  --canvas-deep: #ebe3d0;
+  --canvas-night: #1c1917;
+  --canvas-night-deep: #0c0a09;
+}
+
 html,
 body,
 #root {
   height: 100%;
+}
+
+html {
+  /* The whole page is a single transparent canvas so the fixed hero photo
+     shows through every section. Tracker surfaces paint their own light /
+     dark canvas via Tailwind utilities (see `bg-gradient-to-b from-canvas`),
+     so the body stays neutral. */
+  background: transparent;
 }
 
 body {
@@ -19,8 +41,15 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #0f172a;
-  background-color: #f8fafc;
+  color: var(--ink);
+  background: transparent;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+html.dark body {
+  color: var(--ink-inverse);
 }
 
 @supports (font-variation-settings: normal) {
@@ -42,4 +71,65 @@ body {
 
 button {
   font-family: inherit;
+}
+
+/* Inputs: stable dimensions, no browser-default expansion on focus. */
+input,
+textarea,
+button {
+  outline: none;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+}
+
+/* Fixed full-page background photo. `position: fixed` keeps the photo
+   pinned while the page scrolls, so the trackers' own scroll containers
+   can do their own thing without the photo sliding under them. The dark
+   overlay lifts contrast for the tracker cards without darkening the
+   table cells themselves (which already have a near-white background).
+   The overlay is intentionally flat-ish (0.45 → 0.40 → 0.45 → 0.50) so
+   colours look the same on a tall mobile portrait and a short desktop
+   viewport — the previous wider gradient read as different brightness on
+   each.
+   `image-set()` lets the browser pick WebP when supported and fall back
+   to JPEG elsewhere — covers Safari < 14 and older Android. */
+.page-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgb(10 9 8 / 0.45) 0%,
+      rgb(10 9 8 / 0.4) 40%,
+      rgb(10 9 8 / 0.45) 70%,
+      rgb(10 9 8 / 0.5) 100%
+    ),
+    image-set(
+      url('/images/hero.webp') type('image/webp'),
+      url('/images/hero.jpg') type('image/jpeg')
+    );
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  pointer-events: none;
+}
+
+/* Respect users who don't want motion — kill our landing-card lift + the
+   hero fade-in. The Plank tracker has no decorative motion of its own so
+   this is mostly defensive.
+   `!important` here is intentional: `prefers-reduced-motion` overrides
+   should beat every other animation/transition declaration site-wide,
+   and the standard pattern uses `!important` to win the cascade. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

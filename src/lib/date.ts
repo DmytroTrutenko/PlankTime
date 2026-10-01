@@ -13,7 +13,63 @@ const MONTHS_LONG = [
   'Dec',
 ] as const;
 
+const MONTHS_FULL = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
 const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+export interface MonthGroup {
+  year: number;
+  month: number;
+  label: string;
+  fullLabel: string;
+  dates: Date[];
+  isCompleted: boolean;
+  isCurrent: boolean;
+}
+
+export function groupDatesByMonth(year: number, today: Date = new Date()): MonthGroup[] {
+  const all = generateYearDates(year);
+  const todayMidnight = new Date(today);
+  todayMidnight.setHours(0, 0, 0, 0);
+
+  const groups: MonthGroup[] = [];
+  for (const date of all) {
+    const month = date.getMonth();
+    const last = groups[groups.length - 1];
+    if (!last || last.month !== month) {
+      const monthEnd = new Date(year, month + 1, 0);
+      monthEnd.setHours(0, 0, 0, 0);
+      groups.push({
+        year,
+        month,
+        label: MONTHS_LONG[month],
+        fullLabel: MONTHS_FULL[month],
+        dates: [],
+        isCompleted: monthEnd.getTime() < todayMidnight.getTime(),
+        isCurrent:
+          date.getFullYear() === todayMidnight.getFullYear() && month === todayMidnight.getMonth(),
+      });
+    }
+    // Push into the LAST group (just-created on a month boundary, or the
+    // previous group when month is unchanged). Using `last` here would be
+    // wrong because `last` is a const captured before the push above.
+    groups[groups.length - 1]!.dates.push(date);
+  }
+  return groups;
+}
 
 export function getCurrentYear(): number {
   return new Date().getFullYear();
@@ -67,7 +123,19 @@ export function formatSeconds(totalSeconds: number | null | undefined): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
-const TIME_INPUT_PATTERN = /^\d{1,2}(:\d{1,2}){0,2}$/;
+// Plain integer formatter for rep-counting exercises (push-ups etc).
+// Mirrors the `formatSeconds` shape so SummaryBar + ProgressTable can swap
+// one formatter prop and stay identical in layout.
+export function formatReps(value: number | null | undefined): string {
+  if (value == null || value <= 0) return '—';
+  return String(value);
+}
+
+// Accept `:`, `.`, and `,` as the m:ss separator so the mobile numeric /
+// decimal keypad (`inputMode="decimal"` on iOS Safari and Android Chrome
+// only exposes the locale's decimal separator — typically `.` or `,` —
+// and has no `:` key) can be used to type a time.
+const TIME_INPUT_PATTERN = /^\d{1,4}([.:,]\d{1,2}){0,2}$/;
 
 export function parseTimeInput(input: string): number | null {
   const trimmed = input.trim();
@@ -75,14 +143,29 @@ export function parseTimeInput(input: string): number | null {
 
   if (!TIME_INPUT_PATTERN.test(trimmed)) return null;
 
-  const parts = trimmed.split(':').map((p) => Number.parseInt(p, 10));
+  const parts = trimmed.split(/[.:,]/).map((p) => Number.parseInt(p, 10));
   if (parts.some((n) => Number.isNaN(n) || n < 0)) return null;
 
   if (parts.length === 1) {
-    return parts[0]!;
+    // Bare number = minutes by default. Typing "3" → 3:00 (180 s), not 3 s.
+    // For sub-minute values use the colon form, e.g. "0:30".
+    return parts[0]! * 60;
   }
   if (parts.length === 2) {
     return parts[0]! * 60 + parts[1]!;
   }
   return parts[0]! * 3600 + parts[1]! * 60 + parts[2]!;
+}
+
+// Integer parser for rep-counting exercises. Accepts any non-negative
+// whole number; everything else (decimals, separators, junk) returns null
+// so the input is left empty rather than silently corrupted.
+const REPS_INPUT_PATTERN = /^\d{1,5}$/;
+
+export function parseRepsInput(input: string): number | null {
+  const trimmed = input.trim();
+  if (trimmed === '') return null;
+  if (!REPS_INPUT_PATTERN.test(trimmed)) return null;
+  const value = Number.parseInt(trimmed, 10);
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
